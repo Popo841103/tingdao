@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-CN"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<meta name="apple-mobile-web-app-capable" content="yes"><meta name="theme-color" content="#8fd0ea">
+<meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="听道"><link rel="manifest" href="manifest.json"><link rel="apple-touch-icon" href="icon-192.png"><meta name="theme-color" content="#8fd0ea">
 <title>听道 · 灵河求生</title>
 <style>
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
@@ -11,6 +11,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#9fd3ea;font-family:"P
 #loading{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:linear-gradient(#bfe6f6,#f4eedc);z-index:50;font-size:18px;gap:10px;text-align:center;padding:20px}
 #loading b{font-size:34px;letter-spacing:6px;color:#2f6f8a}
 /* 开始界面 */
+#rot{display:none;position:fixed;inset:0;z-index:99;background:#1d3442;color:#fff;font-size:20px;align-items:center;justify-content:center;flex-direction:column;gap:14px;text-align:center}#rot b{font-size:56px;display:inline-block;animation:rr 1.6s ease-in-out infinite}@keyframes rr{50%{transform:rotate(90deg)}}@media (orientation:portrait) and (pointer:coarse){#rot{display:flex}}
 #start{position:fixed;inset:0;z-index:40;display:flex;align-items:center;justify-content:center;padding:12px;background:linear-gradient(rgba(190,230,248,.35),rgba(255,246,228,.55))}
 #start .box{width:min(760px,100%);max-height:100%;overflow:auto;padding:18px 20px}
 #start h1{margin:0;text-align:center;font-size:38px;letter-spacing:10px;color:#2f6f8a}
@@ -45,7 +46,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#9fd3ea;font-family:"P
 #mmw{position:absolute;right:calc(10px + env(safe-area-inset-right));top:calc(8px + env(safe-area-inset-top));padding:5px;display:flex;flex-direction:column;align-items:center;gap:4px}
 #mm{width:160px;height:160px;border-radius:10px;display:block;cursor:pointer;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.25)}
 #bigmap canvas{width:100%;height:auto;border-radius:12px;display:block}
-.sm{display:flex;gap:5px}.sm button{font:inherit;font-size:12px;border:0;border-radius:10px;padding:5px 8px;background:#fff;color:#3a5a6a;box-shadow:0 2px 0 #cfdde4;font-weight:700}
+.sm{display:flex;gap:5px}#mmw.nomap #mm{display:none}.sm button{font:inherit;font-size:12px;border:0;border-radius:10px;padding:5px 8px;background:#fff;color:#3a5a6a;box-shadow:0 2px 0 #cfdde4;font-weight:700}
 #fps{font-size:10px;color:#8a8a8a}
 #boss{position:absolute;left:50%;transform:translateX(-50%);top:calc(64px + env(safe-area-inset-top));width:min(420px,60vw);display:none;text-align:center;font-weight:700;font-size:13px;color:#fff;text-shadow:0 1px 3px #000}
 #boss .t{height:12px;background:rgba(0,0,0,.4);border-radius:7px;overflow:hidden;border:2px solid rgba(255,255,255,.8);margin-top:2px}#bossF{display:block;height:100%;background:linear-gradient(90deg,#c8202a,#ff6040)}
@@ -104,7 +105,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#9fd3ea;font-family:"P
 @media (max-height:480px){#quest{top:calc(100px + env(safe-area-inset-top));font-size:11.5px}#mm{width:120px;height:120px}#acts{transform:scale(.85);transform-origin:right bottom}#start h1{font-size:28px}}
 @media (min-width:900px) and (pointer:fine){#joyHint{display:none}}
 </style></head><body>
-<canvas id="c"></canvas>
+<div id="rot"><b>📱</b>请把手机横过来玩<br><span style="font-size:14px;opacity:.75">（如果转不过来：打开手机的「自动旋转」，关掉「竖屏锁定」）</span></div><canvas id="c"></canvas>
 <div id="loading"><b>听道</b><div>正在加载 3D 引擎…（第一次打开需要联网）</div><div id="lmsg" style="font-size:13px;color:#8a7a60"></div></div>
 <div id="start" style="display:none"><div class="box pan">
   <h1>听道</h1><div class="sub">灵河求生 · 中州篇<br>九州之地，中州最强。上四州属原生修士，下四州为穿越者所据。<br>你流落到中州的「灵河界」——活下去，然后造舟回乡，或者击败敌首。</div>
@@ -126,7 +127,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#9fd3ea;font-family:"P
   <div id="quest" class="pan"></div>
   <div id="inv"></div>
   <div id="boss"><span id="bossN"></span><div class="t"><i id="bossF"></i></div></div>
-  <div id="mmw" class="pan pe"><canvas id="mm" width="320" height="320"></canvas><div class="sm"><button id="petB">灵兽</button><button id="mapB">九洲</button><button id="setB">设置</button></div><div id="fps"></div></div>
+  <div id="mmw" class="pan pe"><canvas id="mm" width="320" height="320"></canvas><div class="sm"><button id="petB">灵兽</button><button id="mapB">九洲</button><button id="setB">设置</button></div><div class="sm"><button id="mmT">隐藏地图</button><button id="quitB" style="background:#ffe9c7;color:#8a4a10">存档退出</button></div><div id="fps"></div></div>
   <div id="toast"></div>
   <div id="joyHint">按住拖动<br>移动</div>
   <div id="acts" class="pe">
@@ -1585,7 +1586,8 @@ function drawStart(){document.querySelectorAll('.fac').forEach(c=>c.classList.to
   const s=slot(pickF);el('cont').style.display=s?'':'none';if(s)el('cont').textContent='继续'+FACTION[pickF].n+'（第 '+s.day+' 天'+(s.reg&&s.reg!=='mid'?' · '+regName(s.reg):'')+'）';
   newArm=false;el('newg').textContent=s?'新游戏（'+FACTION[pickF].n+'）':'新游戏'}
 document.querySelectorAll('.fac').forEach(c=>c.onclick=()=>{pickF=c.dataset.f;if(!(ORIGINS[pickF]||{})[pickO])pickO=Object.keys(ORIGINS[pickF])[0];drawStart()});drawStart();
-async function go(sv){el('start').style.display='none';el('hud').style.display='';await startGame(sv?sv.faction:pickF,sv?sv.origin:pickO,sv);if(G.faction!=='A')el('manaRow').firstChild.textContent='能量';
+function landLock(){try{if(matchMedia('(pointer:coarse)').matches){const d=document.documentElement,f=d.requestFullscreen||d.webkitRequestFullscreen;const lk=()=>{try{screen.orientation&&screen.orientation.lock&&screen.orientation.lock('landscape').catch(()=>{})}catch(e){}};if(f&&!document.fullscreenElement&&!matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches){const r=f.call(d);r&&r.then?r.then(lk,()=>{}):lk()}else lk()}}catch(e){}}
+async function go(sv){landLock();el('start').style.display='none';el('hud').style.display='';await startGame(sv?sv.faction:pickF,sv?sv.origin:pickO,sv);if(G.faction!=='A')el('manaRow').firstChild.textContent='能量';
   el('skillB').textContent=G.faction==='A'?'火符':'射击';}
 el('newg').onclick=()=>{if(slot(pickF)&&!newArm){newArm=true;el('newg').textContent='再点一次：覆盖'+FACTION[pickF].n+'的旧存档开新局';return}
   try{localStorage.removeItem(SAVE_KEY+'_'+pickF)}catch(e){}
@@ -1629,6 +1631,7 @@ const K={};addEventListener('keydown',e=>{if(e.repeat&&e.code!=='Space')return;K
   if(e.code==='Space'){IN.jump=!e.repeat;IN.jumpHeld=true;e.preventDefault()}
   if(e.code==='KeyE'){const t=findInteract();if(t&&!busy())t.fn()}if(e.code==='KeyF')attack();if(e.code==='KeyR')skill();if(e.code==='KeyQ')eat();
   if(e.code==='KeyC'||e.code==='Tab'){e.preventDefault();const on=!el('craft').classList.contains('on');if(on)drawCraft();panel('craft',on)}
+  if(e.code==='KeyN'){setMM(!el('mmw').classList.contains('nomap'))}
   if(e.code==='KeyM'){const on=!el('map9').classList.contains('on');if(on)draw9();panel('map9',on)}
   if(e.code==='KeyP'){const on=!el('stat').classList.contains('on');if(on)drawStat();panel('stat',on)}
   if(e.code==='KeyT')cycleSkill();if(e.code==='KeyG')startMeditate();if(e.code==='KeyH'){const on=!el('pets').classList.contains('on');if(on)drawPets();panel('pets',on)}
@@ -1654,7 +1657,11 @@ function draw9(){const cur=G.started?ORIGINS[G.faction][G.origin]:'';const cell=
 function drawSet(){el('qBtn').textContent='画质：'+(Q.low?'流畅（省电）':'高清');}
 el('qBtn').onclick=()=>{try{localStorage.setItem('td5_q',Q.low?'high':'low')}catch(e){}save();location.reload()};
 el('saveBtn').onclick=()=>{save();toast('已存档')};
-el('quitBtn').onclick=()=>{if(!G.dead&&!G.over)save();try{sessionStorage.removeItem('td5_auto');sessionStorage.removeItem('td5_new')}catch(e){}location.reload()};
+function quitGame(){if(!G.dead&&!G.over)save();try{sessionStorage.removeItem('td5_auto');sessionStorage.removeItem('td5_new')}catch(e){}location.reload()}
+el('quitBtn').onclick=quitGame;el('quitB').onclick=()=>{if(confirmQuit())quitGame()};
+function confirmQuit(){const b=el('quitB');if(b.dataset.sure){return true}b.dataset.sure=1;b.textContent='再点一次退出';setTimeout(()=>{delete b.dataset.sure;b.textContent='存档退出'},2500);return false}
+function setMM(h){el('mmw').classList.toggle('nomap',h);el('mmT').textContent=h?'显示地图':'隐藏地图';try{localStorage.setItem('td5_mmh',h?'1':'')}catch(e){}}
+el('mmT').onclick=()=>setMM(!el('mmw').classList.contains('nomap'));try{if(localStorage.getItem('td5_mmh'))setMM(true)}catch(e){}
 el('glbBtn').onclick=()=>el('glbIn').click();
 el('glbIn').onchange=async e=>{const f=e.target.files[0];if(!f)return;el('glbMsg').textContent='正在载入 '+f.name+' …';
   try{const g=await importGLB(f,el('flip').checked);el('glbMsg').innerHTML='载入成功。动作列表：<br>'+(g.names.map(n=>'· '+n).join('<br>')||'（文件里没有动作）')}catch(err){el('glbMsg').textContent='载入失败：'+(err&&err.message||err)+'。请确认是 .glb 文件'}e.target.value=''};
