@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="听道"><link rel="manifest" href="manifest.json"><link rel="apple-touch-icon" href="icon-192.png"><meta name="theme-color" content="#8fd0ea">
+<title>听道 · 灵河求生</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+html,body{margin:0;height:100%;overflow:hidden;background:#9fd3ea;font-family:"PingFang SC","Microsoft YaHei","Noto Sans SC",system-ui,sans-serif;color:#2b2a26;touch-action:none}
+#c{position:fixed;inset:0;width:100%;height:100%;display:block}
+.pan{background:rgba(255,250,240,.9);border:2px solid #fff;border-radius:16px;box-shadow:0 6px 24px rgba(40,60,80,.18)}
+#loading{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:linear-gradient(#bfe6f6,#f4eedc);z-index:50;font-size:18px;gap:10px;text-align:center;padding:20px}
+#loading b{font-size:34px;letter-spacing:6px;color:#2f6f8a}
+/* 开始界面 */
+#rot{display:none;position:fixed;inset:0;z-index:99;background:#1d3442;color:#fff;font-size:20px;align-items:center;justify-content:center;flex-direction:column;gap:14px;text-align:center}#rot b{font-size:56px;display:inline-block;animation:rr 1.6s ease-in-out infinite}@keyframes rr{50%{transform:rotate(90deg)}}@media (orientation:portrait) and (pointer:coarse){#rot{display:flex}}
+#wp{position:absolute;left:50%;top:calc(52px + env(safe-area-inset-top));transform:translateX(-50%);display:flex;align-items:center;gap:8px;padding:5px 14px 5px 8px;border-radius:20px;background:rgba(30,42,52,.78);color:#fff;font-size:14px;font-weight:700;pointer-events:none;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.25)}
+#wp .ar{display:inline-block;width:26px;height:26px;line-height:26px;text-align:center;border-radius:50%;background:#ffd23a;color:#5a3a00;font-size:16px;transition:transform .12s}
+#ip{position:absolute;left:0;top:0;padding:4px 10px;border-radius:12px;background:rgba(255,250,236,.95);color:#5a3a10;font-size:13px;font-weight:800;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.3);pointer-events:none}
+#ip i{font-style:normal;display:inline-block;margin-right:6px;padding:0 6px;border-radius:6px;background:#f0a020;color:#fff}
+#qdone{position:absolute;left:50%;top:calc(96px + env(safe-area-inset-top));transform:translate(-50%,-12px);min-width:min(320px,80vw);max-width:86vw;padding:10px 18px;border-radius:16px;background:linear-gradient(#fff7df,#ffe9b0);color:#5a3a10;text-align:center;box-shadow:0 4px 16px rgba(0,0,0,.3);border:2px solid #f0b030;opacity:0;pointer-events:none;transition:opacity .3s,transform .3s}
+#qdone.on{opacity:1;transform:translate(-50%,0)}#qdone .h{font-size:17px;font-weight:900;color:#2f8a2f}#qdone .r{font-size:14px;margin-top:3px}#qdone .n{font-size:13px;margin-top:4px;color:#7a5a30}
+#quest .qp{margin-top:2px;font-weight:800;color:#2a6a9a}#quest .qa{margin-top:3px;font-size:11.5px;color:#4a5a62}#quest .qr{margin-top:3px;font-size:11.5px;color:#a0601a;font-weight:700}
+.ab.hint{animation:pulse 1s infinite;outline:3px solid #ffd23a;outline-offset:2px}
+.rc.hl{opacity:1;outline:3px solid #ffd23a;background:#fffbe8}
+.ft.pick{font-size:17px;color:#fff6c8;text-shadow:0 2px 0 #7a4a10,0 0 4px #000}
+#inv i.fl{animation:invfl .9s}@keyframes invfl{0%{transform:scale(1.35);background:#ffe27a}100%{transform:scale(1)}}
+@media (max-height:480px){#wp{font-size:12.5px;top:calc(40px + env(safe-area-inset-top))}#qdone{top:calc(76px + env(safe-area-inset-top));padding:7px 14px}#qdone .h{font-size:15px}#quest{width:min(340px,44vw)}#quest .qa{font-size:11px}}
+#hud.qdon #toast{bottom:22%}
+@media (max-width:720px){#wp{top:calc(10px + env(safe-area-inset-top))}}
+#start{position:fixed;inset:0;z-index:40;display:flex;align-items:center;justify-content:center;padding:12px;background:linear-gradient(rgba(190,230,248,.35),rgba(255,246,228,.55))}
+#start .box{width:min(760px,100%);max-height:100%;overflow:auto;padding:18px 20px}
+#start h1{margin:0;text-align:center;font-size:38px;letter-spacing:10px;color:#2f6f8a}
+#start .sub{text-align:center;color:#6a6458;margin:4px 0 12px;font-size:14px;line-height:1.6}
+.facs{display:flex;gap:10px}.fac{flex:1;border:2px solid #e6dcc8;background:#fff;border-radius:14px;padding:10px 12px;cursor:pointer}
+.fac.sel{border-color:#e0a040;background:#fff6e2;box-shadow:0 0 0 3px rgba(224,160,64,.25)}
+.fac b{font-size:20px}.fac small{display:block;color:#6a6458;font-size:12.5px;line-height:1.55;margin-top:3px}
+#origins{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0}
+.org{border:2px solid #e6dcc8;background:#fff;border-radius:12px;padding:8px 4px;font:inherit;cursor:pointer;color:inherit}.org.sel{border-color:#3a8ab0;background:#e8f5fb}
+.org b{display:block;font-size:16px}.org small{font-size:11.5px;color:#6a6458}
+.btns{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.big{font:inherit;font-size:18px;font-weight:700;border:0;border-radius:999px;padding:12px 30px;background:linear-gradient(#ffb24a,#f0882a);color:#fff;box-shadow:0 4px 0 #c46a18;cursor:pointer}
+.big.alt{background:linear-gradient(#6ac0e0,#3a96c0);box-shadow:0 4px 0 #2a6e90}.big.ghost{background:#fff;color:#3a6a80;box-shadow:0 3px 0 #c8d8e0}
+.keys{font-size:12px;color:#8a8070;text-align:center;margin-top:10px;line-height:1.6}
+/* HUD */
+#hud{position:fixed;inset:0;pointer-events:none;z-index:10}
+#hud .pe{pointer-events:auto}
+#stats{position:absolute;left:calc(10px + env(safe-area-inset-left));top:calc(8px + env(safe-area-inset-top));width:min(230px,44vw);padding:8px 10px}
+.bar{display:flex;align-items:center;gap:6px;margin:3px 0;font-size:12px;font-weight:700}
+.bar span{width:30px}.bar .t{flex:1;height:10px;border-radius:6px;background:rgba(0,0,0,.12);overflow:hidden}.bar .t i{display:block;height:100%;border-radius:6px;transition:width .15s}
+.bar em{font-style:normal;width:24px;text-align:right;font-size:11px}
+#hpF{background:linear-gradient(90deg,#e8484a,#ff7a6a)}#hungerF{background:linear-gradient(90deg,#e8a02a,#ffd060)}#staF{background:linear-gradient(90deg,#4ab86a,#8ee08a)}#manaF{background:linear-gradient(90deg,#4a8ae8,#8ac8ff)}
+#lvRow{display:flex;align-items:center;gap:6px;margin:4px 0 2px;font-size:12px}#lvRow b{color:#8a5a10;white-space:nowrap}#lvRow .t{flex:1;height:7px;border-radius:5px;background:rgba(0,0,0,.12);overflow:hidden}#xpF{display:block;height:100%;background:linear-gradient(90deg,#f0c040,#ffe58a)}
+#ptsB{font:inherit;font-size:11.5px;font-weight:800;border:0;border-radius:9px;padding:3px 8px;background:#fff;color:#7a5a20;box-shadow:0 2px 0 #e0d0b0;cursor:pointer;pointer-events:auto}#ptsB.lit{background:linear-gradient(#ffd060,#f0a020);color:#fff;animation:pulse 1.2s infinite}
+.ft.xp{font-size:14px;color:#ffe680;text-shadow:0 1px 0 #6a4a10,0 0 3px #000}.ft.lvup{font-size:30px;color:#ffd84a}
+#clock{font-size:12.5px;font-weight:700;margin-top:4px;color:#3a5a6a}#zone{font-size:12px;color:#7a6a50}
+#quest{position:absolute;left:calc(10px + env(safe-area-inset-left));top:calc(118px + env(safe-area-inset-top));width:min(260px,52vw);padding:7px 10px;font-size:12.5px;line-height:1.45}
+#quest b{display:block;color:#d07a20;font-size:11.5px}
+#inv{position:absolute;left:250px;right:150px;top:calc(8px + env(safe-area-inset-top));display:flex;gap:4px;flex-wrap:wrap;justify-content:center}
+@media (max-width:720px){#mm{width:128px;height:128px}#inv{top:auto;left:10px;right:auto;max-width:calc(100vw - 290px);bottom:calc(160px + env(safe-area-inset-bottom));justify-content:flex-start}}
+#inv i{font-style:normal;font-size:11.5px;background:rgba(255,250,240,.88);border-radius:10px;padding:2px 7px;border:1.5px solid #fff}#inv b{margin-left:3px;color:#b0601a}
+#mmw{position:absolute;right:calc(10px + env(safe-area-inset-right));top:calc(8px + env(safe-area-inset-top));padding:5px;display:flex;flex-direction:column;align-items:center;gap:4px}
+#mm{width:160px;height:160px;border-radius:10px;display:block;cursor:pointer;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.25)}
+#bigmap canvas{width:100%;height:auto;border-radius:12px;display:block}
+.sm{display:flex;gap:5px}#mmw.nomap #mm{display:none}.sm button{font:inherit;font-size:12px;border:0;border-radius:10px;padding:5px 8px;background:#fff;color:#3a5a6a;box-shadow:0 2px 0 #cfdde4;font-weight:700}
+#fps{font-size:10px;color:#8a8a8a}
+#boss{position:absolute;left:50%;transform:translateX(-50%);top:calc(64px + env(safe-area-inset-top));width:min(420px,60vw);display:none;text-align:center;font-weight:700;font-size:13px;color:#fff;text-shadow:0 1px 3px #000}
+#boss .t{height:12px;background:rgba(0,0,0,.4);border-radius:7px;overflow:hidden;border:2px solid rgba(255,255,255,.8);margin-top:2px}#bossF{display:block;height:100%;background:linear-gradient(90deg,#c8202a,#ff6040)}
+#toast{position:absolute;left:50%;bottom:calc(46% + 10px);transform:translate(-50%,10px);max-width:86vw;padding:9px 16px;border-radius:14px;background:rgba(40,50,60,.82);color:#fff;font-size:14.5px;line-height:1.5;text-align:center;opacity:0;transition:.25s}
+#toast.on{opacity:1;transform:translate(-50%,0)}
+/* 操作按钮 */
+#joy{position:fixed;width:140px;height:140px;border-radius:50%;background:rgba(255,255,255,.22);border:3px solid rgba(255,255,255,.6);pointer-events:none;opacity:0;transition:opacity .15s;z-index:11}
+#joy.on{opacity:1}#knob{position:absolute;left:43px;top:43px;width:54px;height:54px;border-radius:50%;background:rgba(255,255,255,.85);box-shadow:0 2px 8px rgba(0,0,0,.2)}
+#joyHint{position:absolute;left:calc(26px + env(safe-area-inset-left));bottom:calc(26px + env(safe-area-inset-bottom));width:120px;height:120px;border-radius:50%;border:3px dashed rgba(255,255,255,.6);display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;text-shadow:0 1px 3px rgba(0,0,0,.4)}
+#acts{position:absolute;right:calc(14px + env(safe-area-inset-right));bottom:calc(14px + env(safe-area-inset-bottom));width:250px;height:230px}
+.ab{position:absolute;border:0;border-radius:50%;font:inherit;font-weight:800;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.35);box-shadow:0 4px 0 rgba(0,0,0,.18),inset 0 2px 0 rgba(255,255,255,.4);display:flex;align-items:center;justify-content:center;text-align:center;line-height:1.1;padding:4px;cursor:pointer}
+.ab.dn{transform:translateY(3px) scale(.95);box-shadow:0 1px 0 rgba(0,0,0,.18)}
+#atkB{right:0;bottom:0;width:92px;height:92px;font-size:20px;background:radial-gradient(circle at 40% 35%,#ff8a6a,#e04a3a)}
+#jumpB{right:104px;bottom:-2px;width:70px;height:70px;font-size:16px;background:radial-gradient(circle at 40% 35%,#7ad0ff,#3a96d0)}
+#actB{right:6px;bottom:104px;width:82px;height:82px;font-size:13px;background:radial-gradient(circle at 40% 35%,#c8c8c8,#9a9a9a)}
+#actB.lit{background:radial-gradient(circle at 40% 35%,#ffd86a,#f0a020);animation:pulse 1.2s infinite}
+@keyframes pulse{50%{box-shadow:0 4px 0 rgba(0,0,0,.18),0 0 0 6px rgba(255,210,90,.35)}}
+#skillB{right:98px;bottom:78px;width:62px;height:62px;font-size:14px;background:radial-gradient(circle at 40% 35%,#c08aff,#7a4ad8)}
+#eatB{right:176px;bottom:70px;width:54px;height:54px;font-size:14px;background:radial-gradient(circle at 40% 35%,#9ee07a,#4aa83a)}
+#runB{right:184px;bottom:4px;width:52px;height:52px;font-size:13px;background:radial-gradient(circle at 40% 35%,#9aa8b8,#6a7a8a)}#runB.lit{background:radial-gradient(circle at 40% 35%,#8af0b0,#2ab070)}
+#wpnB{right:100px;bottom:150px;width:72px;height:40px;border-radius:20px;font-size:12px;background:linear-gradient(#8a7a6a,#6a5a4a)}
+#qiF{background:linear-gradient(90deg,#7a5aff,#c8a8ff)}
+#medB{right:186px;bottom:198px;width:54px;height:54px;font-size:13px;background:radial-gradient(circle at 40% 35%,#8ae0ff,#3a8ac8)}#medB.lit{background:radial-gradient(circle at 40% 35%,#c8f8ff,#4ac8e8);animation:pulse 1.2s infinite}
+#swB{right:60px;bottom:192px;width:38px;height:38px;font-size:12px;background:radial-gradient(circle at 40% 35%,#d8b8ff,#8a5ad8)}
+.realm{margin-top:8px;padding:8px;border-radius:10px;background:#fff8e8;line-height:1.7}.realm .req{display:flex;flex-wrap:wrap;gap:4px}.realm .req i{font-style:normal;font-size:12px;background:#eef6e8;border-radius:8px;padding:1px 6px}.realm .req i.no{background:#fde8e4;color:#b04030}.realm small{display:block;color:#7a7060}.realm .big:disabled{background:#ccc;box-shadow:none}
+.roles{display:flex;gap:4px;flex-wrap:wrap}.roles button{font:inherit;font-size:12px;border:0;border-radius:8px;padding:6px 8px;background:#eee;cursor:pointer;font-weight:700}.roles button.on{background:#5ad08a;color:#fff}
+#craftB{right:182px;bottom:132px;width:60px;height:60px;font-size:14px;background:radial-gradient(circle at 40% 35%,#ffbe6a,#d0802a)}
+/* 面板 */
+.modal{position:fixed;inset:0;z-index:30;display:none;align-items:center;justify-content:center;background:rgba(40,60,80,.25);padding:10px}
+.modal.on{display:flex}.modal .pan{width:min(560px,100%);max-height:92%;display:flex;flex-direction:column;padding:12px 14px}
+.modal h2{margin:0 0 6px;font-size:20px;display:flex;justify-content:space-between;align-items:center}
+.x{font:inherit;border:0;background:#eee;border-radius:50%;width:34px;height:34px;font-size:18px;cursor:pointer}
+#ctabs{display:flex;gap:6px;margin-bottom:6px}#ctabs button{font:inherit;flex:1;border:0;border-radius:10px;padding:7px;background:#eee;font-weight:700;cursor:pointer}#ctabs .sel{background:#ffcf7a}
+.list{overflow:auto;flex:1}
+.rc{display:flex;align-items:center;gap:8px;padding:8px;border-radius:12px;background:#fff;margin:5px 0;opacity:.75}.rc.ok{opacity:1;box-shadow:0 0 0 2px #ffcf7a}
+.rc>div{flex:1}.rc b{font-size:15.5px}.rc em{font-style:normal;font-size:11px;color:#3a9a5a}.rc small{display:block;color:#7a7060;font-size:12px}
+.rc span{display:flex;flex-wrap:wrap;gap:4px;margin-top:3px}.rc span i{font-style:normal;font-size:11.5px;background:#eef6e8;border-radius:8px;padding:1px 6px}.rc span i.no{background:#fde8e4;color:#b04030}
+.rc button{font:inherit;border:0;border-radius:10px;padding:9px 14px;background:linear-gradient(#ffb24a,#f0882a);color:#fff;font-weight:800;cursor:pointer}.rc button:disabled{background:#ccc}
+#cinv,#tinv{font-size:12px;color:#6a6050;margin-top:6px;display:flex;flex-wrap:wrap;gap:4px}#cinv i{font-style:normal;background:#fff;border-radius:8px;padding:1px 6px}
+#nine .row{display:flex;gap:8px;justify-content:center;margin:8px 0}
+.zh{flex:1;max-width:120px;padding:12px 4px;border-radius:12px;text-align:center;font-weight:800;font-size:15px;color:#fff}.zh small{display:block;font-size:11px}
+.zh.up{background:linear-gradient(#7ab8e8,#4a88c8)}.zh.down{background:linear-gradient(#e8a86a,#c87a3a)}.zh.mid{max-width:220px;background:linear-gradient(#ffd25a,#e0a020);font-size:20px;padding:18px}
+.zh.me{box-shadow:0 0 0 4px #fff,0 0 0 7px #3ab070}
+.lore{font-size:13px;line-height:1.7;color:#5a5448}
+.srow{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}.srow button{font:inherit;border:0;border-radius:10px;padding:10px 14px;background:#fff;box-shadow:0 2px 0 #d8d0c0;font-weight:700;cursor:pointer}
+#glbMsg{font-size:12.5px;color:#4a6a5a;line-height:1.6;max-height:140px;overflow:auto}
+#fade{position:fixed;inset:0;background:#0a0e18;opacity:0;pointer-events:none;transition:opacity 1.2s;z-index:25}#fade.on{opacity:1}
+#hurt{position:fixed;inset:0;pointer-events:none;z-index:9;opacity:0;background:radial-gradient(transparent 55%,rgba(220,30,30,.55))}#hurt.on{animation:hurt .45s}
+@keyframes hurt{0%{opacity:1}100%{opacity:0}}
+#fx{position:fixed;inset:0;pointer-events:none;z-index:8;overflow:hidden}
+.ft{position:absolute;left:0;top:0;font-weight:900;font-size:20px;color:#fff;text-shadow:0 2px 0 #b04020,0 0 4px #000;white-space:nowrap}.ft.crit{font-size:26px;color:#ffe04a}.ft.hurt{color:#ff6a5a}.ft.heal{color:#7aff8a}
+.hpb{position:absolute;left:0;top:0;width:54px;height:7px;background:rgba(0,0,0,.45);border-radius:4px;overflow:hidden;border:1px solid rgba(255,255,255,.7)}.hpb i{display:block;height:100%;background:#ff4a3a}
+.full{position:fixed;inset:0;z-index:45;display:none;align-items:center;justify-content:center;flex-direction:column;gap:14px;text-align:center;padding:20px;background:rgba(255,248,236,.75)}
+.full.on{display:flex}.full h1{margin:0;font-size:40px;letter-spacing:8px;color:#2f6f8a}.full p{font-size:16px;line-height:1.8;max-width:560px}
+#death{background:rgba(60,30,30,.6);color:#fff}#death h1{color:#ffd0c0}
+@media (max-height:480px){#quest{top:calc(100px + env(safe-area-inset-top));font-size:11.5px}#mm{width:120px;height:120px}#acts{transform:scale(.85);transform-origin:right bottom}#start h1{font-size:28px}}
+@media (min-width:900px) and (pointer:fine){#joyHint{display:none}}
+</style></head><body>
+<div id="rot"><b>📱</b>请把手机横过来玩<br><span style="font-size:14px;opacity:.75">（如果转不过来：打开手机的「自动旋转」，关掉「竖屏锁定」）</span></div><canvas id="c"></canvas>
+<div id="loading"><b>听道</b><div>正在加载 3D 引擎…（第一次打开需要联网）</div><div id="lmsg" style="font-size:13px;color:#8a7a60"></div></div>
+<div id="start" style="display:none"><div class="box pan">
+  <h1>听道</h1><div class="sub">灵河求生 · 中州篇<br>九州之地，中州最强。上四州属原生修士，下四州为穿越者所据。<br>你流落到中州的「灵河界」——活下去，然后造舟回乡，或者击败敌首。</div>
+  <div class="facs"><div class="fac" data-f="A"><b>☯ 修士</b><small>来自上四州的原生修仙者。会画火符（技能键），能炼灵剑；后期火符可升级成雷符。</small></div>
+  <div class="fac" data-f="B"><b>⚙ 穿越者</b><small>来自下四州的穿越者。会做工兵铲、弩和火药包，远程火力强。</small></div></div>
+  <div id="origins"></div>
+  <div class="btns"><button class="big" id="newg">开始新游戏</button><button class="big alt" id="cont" style="display:none">继续</button><button class="big ghost" id="m9s">九洲图</button></div>
+  <div class="keys">手机：左半屏拖动=移动（推到底=跑）· 右半屏拖动=转视角 · 右下角按钮操作<br>电脑：WASD 移动 · Shift 跑 · 空格 跳（空中按住=滑翔）· 鼠标拖动转视角 · 左键/F 攻击 · 右键/R 技能 · E 互动 · Q 吃 · C 制造 · M 九洲图 · 1-6 换武器</div>
+</div></div>
+<div id="hud" style="display:none">
+  <div id="stats" class="pan">
+    <div class="bar"><span>生命</span><div class="t"><i id="hpF"></i></div><em id="hpV"></em></div>
+    <div class="bar"><span>饱食</span><div class="t"><i id="hungerF"></i></div><em id="hungerV"></em></div>
+    <div class="bar"><span>体力</span><div class="t"><i id="staF"></i></div><em></em></div>
+    <div class="bar" id="manaRow"><span>灵力</span><div class="t"><i id="manaF"></i></div><em></em></div>
+    <div class="bar"><span>灵气</span><div class="t"><i id="qiF"></i></div><em id="qiV"></em></div>
+    <div id="lvRow"><b id="lvT">Lv.1</b><div class="t"><i id="xpF"></i></div><button id="ptsB" class="pe">人物</button></div>
+    <div id="clock"></div><div id="zone"></div></div>
+  <div id="quest" class="pan"></div>
+  <div id="inv"></div>
+  <div id="boss"><span id="bossN"></span><div class="t"><i id="bossF"></i></div></div>
+  <div id="mmw" class="pan pe"><canvas id="mm" width="320" height="320"></canvas><div class="sm"><button id="petB">灵兽</button><button id="mapB">九洲</button><button id="setB">设置</button></div><div class="sm"><button id="mmT">隐藏地图</button><button id="quitB" style="background:#ffe9c7;color:#8a4a10">存档退出</button></div><div id="fps"></div></div>
+  <div id="toast"></div>
+  <div id="joyHint">按住拖动<br>移动</div>
+  <div id="acts" class="pe">
+    <button class="ab" id="atkB">攻击</button><button class="ab" id="jumpB">跳</button><button class="ab" id="actB">互动</button>
+    <button class="ab" id="skillB">技能</button><button class="ab" id="eatB">吃</button><button class="ab" id="runB">跑</button>
+    <button class="ab" id="wpnB"><span id="wpn">空手</span></button><button class="ab" id="craftB">制造</button><button class="ab" id="medB">修炼</button><button class="ab" id="swB">换</button>
+  </div>
+</div>
+<div id="joy"><div id="knob"></div></div>
+<div id="fx"></div><div id="hurt"></div><div id="fade"></div>
+<div class="modal" id="craft"><div class="pan"><h2>制造 · 建造<button class="x" data-close="craft">✕</button></h2><div id="ctabs"></div><div class="list" id="clist"></div><div id="cinv"></div></div></div>
+<div class="modal" id="trade"><div class="pan"><h2>坊市商人<button class="x" data-close="trade">✕</button></h2><div class="lore">「客官，灵石换货，童叟无欺。」</div><div class="list" id="tlist"></div><div id="tinv"></div></div></div>
+<div class="modal" id="map9"><div class="pan"><h2>九洲图<button class="x" data-close="map9">✕</button></h2><div id="nine"></div>
+  <div class="lore">天下分为九大洲。<b>中州</b>居中，势力最强，灵河界就在中州。<br><b>上四州</b>（上云州、上玄州、上天州、上仙州）由原生修士掌控；<b>下四州</b>（下云州、下玄州、下天州、下仙州）由穿越者掌控。<br>出身加成：云＝体力　玄＝攻击　天＝生命　仙＝耐饿</div></div></div>
+<div class="modal" id="bigmap"><div class="pan" style="width:min(720px,100%)"><h2>灵河界地图<button class="x" data-close="bigmap">✕</button></h2><canvas id="bm"></canvas><div class="lore">黄色箭头是你。红点是敌人和野兽（红色大点是首领），橙圆是篝火，方块是你建的庇护所和田，金点是坊市商人。</div></div></div>
+<div class="modal" id="pets"><div class="pan"><h2>灵兽<button class="x" data-close="pets">✕</button></h2><div class="list" id="plist"></div><div class="lore" id="pinfo"></div></div></div>
+<div class="modal" id="route"><div class="pan"><h2>九州航线图<button class="x" data-close="route">✕</button></h2><div class="lore">每击败一州的首领，就解锁去下一州的航线。越往后越难，终点是「天墟·九州之巅」。去过的州随时可以回去。</div><div class="list" id="rlist"></div></div></div>
+<div class="modal" id="stat"><div class="pan"><h2>人物 · 加点<button class="x" data-close="stat">✕</button></h2><div class="lore" id="slv"></div><div class="list" id="slist"></div><div class="lore" id="sder"></div></div></div>
+<div class="modal" id="set"><div class="pan"><h2>设置<button class="x" data-close="set">✕</button></h2>
+  <div class="srow"><button id="qBtn">画质</button><button id="saveBtn">立即存档</button><button id="quitBtn">保存并回到主菜单</button></div>
+  <div class="lore"><b>替换主角模型（Tripo 导出的 .glb）</b><br>选择文件后马上替换，并记住，下次打开自动使用。</div>
+  <div class="srow"><button id="glbBtn">选择 .glb 文件</button><button id="glbBuiltin">用内置修士 3D 模型</button><button id="glbReset">用简单人物</button><label style="font-size:13px;display:flex;align-items:center;gap:4px"><input type="checkbox" id="flip">人物背对前进方向时勾这里</label></div>
+  <input type="file" id="glbIn" accept=".glb,.gltf,model/gltf-binary" style="display:none"><div id="glbMsg"></div></div></div>
+<div class="full" id="death"><h1>你倒下了</h1><p>读取上一次的存档（睡觉时、每隔一会儿会自动存档）。</p><button class="big" id="reload">读取存档</button></div>
+<div class="full" id="end"><h1 id="endT"></h1><p id="endX"></p><div class="btns"><button class="big alt" id="next" style="display:none">扬帆回乡 · 第二章</button><button class="big" id="again">再来一局</button></div></div>
+<script>window.__t=setTimeout(function(){if(!window.GAME_OK){var m=document.getElementById('lmsg');m.innerHTML='3D 引擎加载失败或太慢。<br>请检查网络后刷新页面；如果在微信里打开，请点右上角「在浏览器打开」。'}},15000);
+window.addEventListener('error',function(e){var m=document.getElementById('lmsg');if(m&&!window.GAME_OK)m.textContent='出错：'+e.message});</script>
+<script type="text/plain" id="heroA">/*__HERO__*/</script>
+<script type="text/plain" id="heroB">/*__HEROB__*/</script>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+<script type="module">
+/*__CODE__*/
+</script>
+</body></html>

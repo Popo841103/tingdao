@@ -1,0 +1,407 @@
+--- /tmp/bk_r1/p1_core.js	2026-11-24 21:09:34.551935153 +0800
++++ p1_core.js	2026-11-24 21:16:19.857079423 +0800
+@@ -19,7 +19,8 @@
+ const lerp=(a,b,t)=>a+(b-a)*t;
+ const smooth=t=>t*t*(3-2*t);
+ let rseed=20261122;const srnd=()=>{rseed=(rseed*16807)%2147483647;return (rseed-1)/2147483646};
+-const Q={low:false};try{Q.low=localStorage.getItem('td5_q')==='low'}catch(e){}
++// 画质三档：high 高清 / low 流畅 / min 极简（旧存的 'low' 照常有效）
++const Q={low:false,min:false,tier:'high'};try{const q=localStorage.getItem('td5_q');Q.tier=q==='low'||q==='min'?q:'high';Q.low=Q.tier!=='high';Q.min=Q.tier==='min'}catch(e){}
+ // 第几章：第一章 中州·灵河界；第二章 回乡（上/下某州）
+ let SAVE0=null;try{SAVE0=JSON.parse(localStorage.getItem('td5_save')||'null')}catch(e){}
+ // 九州区域：中州（第一章）→ 故乡州 → 己方其余三州 → 敌方四州 → 终极区域「天墟」
+@@ -57,8 +58,8 @@
+ 
+ /* ---------- 渲染器 ---------- */
+ const canvas=$('#c');
+-const renderer=new THREE.WebGLRenderer({canvas,antialias:!isTouch,powerPreference:'high-performance'});
+-renderer.setPixelRatio(Math.min(devicePixelRatio,Q.low?1:(isTouch?1.5:2)));
++const renderer=new THREE.WebGLRenderer({canvas,antialias:!isTouch&&!Q.min,powerPreference:'high-performance'});
++renderer.setPixelRatio(Q.min?Math.min(devicePixelRatio,1)*.75:Math.min(devicePixelRatio,Q.low?1:(isTouch?1.5:2)));
+ renderer.shadowMap.enabled=!Q.low;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+ renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=.62;
+ const scene=new THREE.Scene();
+@@ -145,7 +146,7 @@
+ // 可行走表面：地形 + 桥
+ const BRIDGE={z:30,w:3.4};
+ function groundAt(x,z){let g=H(x,z);if(REGD.wat==='ice'||REGD.wat==='cloud')g=Math.max(g,.06);const rx=riverX(BRIDGE.z);if(Math.abs(z-BRIDGE.z)<BRIDGE.w/2&&Math.abs(x-rx)<20)g=Math.max(g,1.7+Math.cos((x-rx)/20*Math.PI/2)*.6);const dz=125,dx=riverX(dz);if(Math.abs(z-dz)<1.5&&x>dx-14.7&&x<dx-4.4)g=Math.max(g,1.2);return g}
+-const T=new THREE.PlaneGeometry(MAP*2.2,MAP*2.2,230,230);T.rotateX(-Math.PI/2);
++const T=new THREE.PlaneGeometry(MAP*2.2,MAP*2.2,Q.min?150:230,Q.min?150:230);T.rotateX(-Math.PI/2);
+ {const p=T.attributes.position,col=[],c=new THREE.Color();
+   const RG=CH===2?REGD.g:['#6fae4a','#8cc25a','#4f8a3a','#e9d6a6','#9a958c'];const SAND=new THREE.Color(RG[3]),GR=new THREE.Color(RG[0]),GR2=new THREE.Color(RG[1]),FOR=new THREE.Color(RG[2]),DIRT=new THREE.Color(REGD.terr==='volcano'?'#2a2220':'#a8895c'),ROCK=new THREE.Color(RG[4]),MUD=new THREE.Color(REGD.wat==='lava'?'#1a1210':REGD.wat==='ice'?'#cfe0ea':'#8c7a5a'),PATH=new THREE.Color(REGD.terr==='city'?'#5a5a62':REGD.terr==='snow'?'#c8d4dc':REGD.terr==='sky'?'#fffaf0':'#c2a878');
+   for(let i=0;i<p.count;i++){const x=p.getX(i),z=p.getZ(i),y=H(x,z);p.setY(i,y);
+@@ -163,7 +164,7 @@
+ const WU={uTime:{value:0},uAmpK:{value:WTR[4]}};
+ waterMat.onBeforeCompile=sh=>{sh.uniforms.uTime=WU.uTime;sh.uniforms.uAmpK=WU.uAmpK;sh.vertexShader='uniform float uTime;uniform float uAmpK;\n'+sh.vertexShader.replace('#include <begin_vertex>',
+   '#include <begin_vertex>\nvec4 wpW=modelMatrix*vec4(transformed,1.);float dc=length(wpW.xz);float amp=mix(.05,.35,smoothstep(150.,230.,dc))*uAmpK;transformed.y+=(sin(wpW.x*.09+uTime*1.1)+cos(wpW.z*.07+uTime*.9))*amp;')};
+-const water=new THREE.Mesh(new THREE.PlaneGeometry(1600,1600,160,160).rotateX(-Math.PI/2),waterMat);water.position.y=0;water.receiveShadow=true;scene.add(water);
++const water=new THREE.Mesh(new THREE.PlaneGeometry(1600,1600,Q.min?64:160,Q.min?64:160).rotateX(-Math.PI/2),waterMat);water.position.y=0;water.receiveShadow=true;scene.add(water);
+ const WATER_Y=0;
+ function waterDepth(x,z){return WATER_Y-groundAt(x,z)}
+ 
+--- /tmp/bk_r1/p2_world.js	2026-11-24 21:09:34.551970217 +0800
++++ p2_world.js	2026-11-24 21:28:35.295143735 +0800
+@@ -7,7 +7,7 @@
+ const mat=(c,o={})=>new THREE.MeshStandardMaterial(Object.assign({color:c,roughness:.85},o));
+ const MAT={bark:mat('#8a6a4a',{map:barkTex}),bark2:mat('#6e5038',{map:barkTex}),pine:mat('#3f7a3e',{map:leafTex}),leaf:mat('#5a9a3c',{map:leafTex}),leaf2:mat('#79b04a',{map:leafTex}),
+   sakura:mat('#f4b6c8',{map:leafTex}),rock:mat('#9b968e',{flatShading:true}),rock2:mat('#857f76',{flatShading:true}),herb:mat('#4fb06a'),herbGlow:mat('#c8ffe0',{emissive:'#3cd08a',emissiveIntensity:.8}),
+-  bush:mat('#3f8a3e',{map:leafTex}),berry:mat('#d62a3a',{roughness:.35}),stick:mat('#9a6a3a'),pebble:mat('#a8a39a',{flatShading:true}),
++  bush:mat('#3f8a3e',{map:leafTex}),berry:mat('#d62a3a',{roughness:.35}),stick:mat('#b47c40'),pebble:mat('#a8a39a',{flatShading:true}),
+   wood:mat('#a87a4e',{map:barkTex}),plank:mat('#c49a68'),wall:mat('#f2ede2'),pillar:mat('#b8432f'),tile:mat('#56657a',{roughness:.7}),cloth:mat('#e8e2d4'),
+   red:mat('#c8402f'),blue:mat('#3a6ab0'),khaki:mat('#b8a068'),dark:mat('#3a3430'),straw:mat('#d8b860'),metal:mat('#8a8f96',{metalness:.6,roughness:.4}),gold:mat('#e0b050',{metalness:.5,roughness:.4}),
+   soil:mat('#6e5034'),maroon:mat('#7a2c2a'),maroon2:mat('#5a1e1e'),lantern:mat('#ff6040',{emissive:'#ff3010',emissiveIntensity:.7}),sprout:mat('#6cc04a'),ripe:mat('#e8c048'),flame:new THREE.MeshBasicMaterial({color:'#ffb050',transparent:true,opacity:.9,blending:THREE.AdditiveBlending,depthWrite:false}),
+@@ -17,6 +17,7 @@
+ const M4=(x=0,y=0,z=0,ry=0,sx=1,sy=1,sz=1,rx=0,rz=0)=>new THREE.Matrix4().compose(new THREE.Vector3(x,y,z),new THREE.Quaternion().setFromEuler(new THREE.Euler(rx,ry,rz)),new THREE.Vector3(sx,sy,sz));
+ 
+ /* ---------- 外部模型（Quaternius Stylized Nature MegaKit，CC0） ---------- */
++const ICO_D=Q.min?1:2;   // 极简画质：树冠/灌木用更少的面
+ const NAT_ON=!Q.low&&typeof NATM!=='undefined';
+ function natGeo(d,sc=1){const b=s=>{const r=atob(s),u=new Uint8Array(r.length);for(let i=0;i<r.length;i++)u[i]=r.charCodeAt(i);return u.buffer};
+   const P=new Int16Array(b(d.p)),N=new Int8Array(b(d.n)),U=new Int16Array(b(d.u)),I=new Uint16Array(b(d.i));
+@@ -50,9 +51,9 @@
+ const TREE_TYPES={
+   pine:{trunk:merged([[new THREE.CylinderGeometry(.18,.32,6,8),M4(0,3)]]),crown:merged([0,1,2,3].map(i=>[new THREE.ConeGeometry(2.4-i*.5,2.6,9),M4(0,3.2+i*1.3,0,i)])),tm:MAT.bark2,cm:MAT.pine,r:.45,hits:5,wood:4},
+   broad:{trunk:merged([[new THREE.CylinderGeometry(.24,.38,4.2,8),M4(0,2.1)],[new THREE.CylinderGeometry(.08,.14,2,6),M4(.5,3.6,0,0,1,1,1,0,-.6)]]),
+-    crown:merged([[new THREE.IcosahedronGeometry(2.2,2),M4(0,5.2)],[new THREE.IcosahedronGeometry(1.6,2),M4(1.4,4.6,.5)],[new THREE.IcosahedronGeometry(1.5,2),M4(-1.2,4.8,-.6)],[new THREE.IcosahedronGeometry(1.3,2),M4(.2,6.3,-.3)]]),tm:MAT.bark,cm:MAT.leaf,r:.5,hits:5,wood:5},
++    crown:merged([[new THREE.IcosahedronGeometry(2.2,ICO_D),M4(0,5.2)],[new THREE.IcosahedronGeometry(1.6,ICO_D),M4(1.4,4.6,.5)],[new THREE.IcosahedronGeometry(1.5,ICO_D),M4(-1.2,4.8,-.6)],[new THREE.IcosahedronGeometry(1.3,ICO_D),M4(.2,6.3,-.3)]]),tm:MAT.bark,cm:MAT.leaf,r:.5,hits:5,wood:5},
+   sakura:{trunk:merged([[new THREE.CylinderGeometry(.2,.32,3.4,8),M4(0,1.7,0,0,1,1,1,0,.08)],[new THREE.CylinderGeometry(.08,.12,2,6),M4(-.5,3,0,0,1,1,1,0,.7)]]),
+-    crown:merged([[new THREE.IcosahedronGeometry(1.9,2),M4(0,4.2)],[new THREE.IcosahedronGeometry(1.4,2),M4(1.3,3.8,.4)],[new THREE.IcosahedronGeometry(1.3,2),M4(-1.4,3.9,-.3)],[new THREE.IcosahedronGeometry(1.1,2),M4(.1,5.3)]]),tm:MAT.bark2,cm:MAT.sakura,r:.45,hits:4,wood:3}};
++    crown:merged([[new THREE.IcosahedronGeometry(1.9,ICO_D),M4(0,4.2)],[new THREE.IcosahedronGeometry(1.4,ICO_D),M4(1.3,3.8,.4)],[new THREE.IcosahedronGeometry(1.3,ICO_D),M4(-1.4,3.9,-.3)],[new THREE.IcosahedronGeometry(1.1,ICO_D),M4(.1,5.3)]]),tm:MAT.bark2,cm:MAT.sakura,r:.45,hits:4,wood:3}};
+ if(NAT_ON){const T=TREE_TYPES;
+   T.broad.trunk=natGeo(NATM.ct3.bark,.78);T.broad.crown=natGeo(NATM.ct3.leaf,.78);T.broad.tm=MAT.barkN;T.broad.cm=MAT.leafN;
+   T.pine.trunk=natGeo(NATM.pine.bark,1.1);T.pine.crown=natGeo(NATM.pine.leaf,1.1);T.pine.tm=MAT.barkN;T.pine.cm=MAT.pineN;
+@@ -99,7 +100,7 @@
+ const herbIM=makeIM(herbGeo,MAT.herb,herbList);const herbBulb=makeIM(new THREE.SphereGeometry(.09,8,6).translate(0,.56,0),MAT.herbGlow,herbList);
+ herbList.forEach((h,i)=>nodes.push(Object.assign(h,{kind:'herb',name:'灵草',i,im:herbIM,im2:herbBulb,alive:true,t:0})));
+ // 浆果丛
+-const bushGeo=NAT_ON?natGeo(NATM.bush.leaf,.8):merged([[new THREE.IcosahedronGeometry(.75,2),M4(0,.55,0,0,1,.8,1)],[new THREE.IcosahedronGeometry(.55,2),M4(.5,.45,.2)],[new THREE.IcosahedronGeometry(.5,2),M4(-.45,.42,-.2)]]);
++const bushGeo=NAT_ON?natGeo(NATM.bush.leaf,.8):merged([[new THREE.IcosahedronGeometry(.75,ICO_D),M4(0,.55,0,0,1,.8,1)],[new THREE.IcosahedronGeometry(.55,ICO_D),M4(.5,.45,.2)],[new THREE.IcosahedronGeometry(.5,ICO_D),M4(-.45,.42,-.2)]]);
+ const berryGeo=merged(Array.from({length:12},(_,k)=>{const a=k*2.4,e=.3+(k%4)*.25;return[new THREE.SphereGeometry(.09,8,6),M4(Math.cos(a)*.72*Math.cos(e),.5+Math.sin(e)*.5,Math.sin(a)*.72*Math.cos(e))]}));
+ const bushList=scatter(70,(x,z,y)=>y>1.5&&y<10&&(!zoneOf(x,z)||zoneOf(x,z)==='forest')&&nearRoad(x,z)>3);
+ const bushIM=makeIM(bushGeo,MAT.bush,bushList),berryIM=makeIM(berryGeo,MAT.berry,bushList);
+@@ -107,10 +108,10 @@
+ // 地上的树枝和石子（开局好上手）
+ const stickGeo=merged([0,1,2].map(k=>[new THREE.CylinderGeometry(.04,.05,1,5),M4(0,.06+k*.05,0,k*1.1,1,1,1,0,Math.PI/2)]));
+ const stickList=scatter(70,(x,z,y)=>y>1.2&&y<10&&!['market','enemy'].includes(zoneOf(x,z)));
+-for(let i=0;i<6;i++)stickList.push({x:ZONES.home.x+rnd(-12,12),z:ZONES.home.z+rnd(-12,12),y:0});stickList.forEach(p=>p.y=H(p.x,p.z));
++for(let i=0;i<6;i++)stickList.push({x:ZONES.home.x+rnd(-12,12),z:ZONES.home.z+rnd(-12,12),y:0});stickList.forEach(p=>{p.y=H(p.x,p.z);p.s=1.35});
+ const stickIM=makeIM(stickGeo,MAT.stick,stickList);stickList.forEach((p,i)=>nodes.push(Object.assign(p,{kind:'stick',name:'树枝',i,im:stickIM,alive:true,t:0})));
+ const pebList=scatter(55,(x,z,y)=>y>.8&&y<14&&!['market','enemy'].includes(zoneOf(x,z)));
+-for(let i=0;i<5;i++)pebList.push({x:ZONES.home.x+rnd(-12,12),z:ZONES.home.z+rnd(-12,12),y:0});pebList.forEach(p=>p.y=H(p.x,p.z)+.05);
++for(let i=0;i<5;i++)pebList.push({x:ZONES.home.x+rnd(-12,12),z:ZONES.home.z+rnd(-12,12),y:0});pebList.forEach(p=>{p.y=H(p.x,p.z)+.05;p.s=1.3});
+ const pebIM=makeIM(merged([[new THREE.DodecahedronGeometry(.16,0),M4(0,.08,0,0,1,.6,1)],[new THREE.DodecahedronGeometry(.11,0),M4(.18,.05,.1,0,1,.6,1)]]),MAT.pebble,pebList);
+ pebList.forEach((p,i)=>nodes.push(Object.assign(p,{kind:'pebble',name:'石子',i,im:pebIM,alive:true,t:0})));
+ function setNode(n,vis){n.im.setMatrixAt(n.i,vis?n.m:ZERO);n.im.instanceMatrix.needsUpdate=true;if(n.im2){n.im2.setMatrixAt(n.i,vis?n.m:ZERO);n.im2.instanceMatrix.needsUpdate=true}if(n.col&&n.kind==='rock')n.col.off=!vis}
+@@ -331,7 +332,7 @@
+   g.userData.sail=sail;g.traverse(m=>{if(m.isMesh){m.castShadow=m.receiveShadow=true}});return g}
+ 
+ /* ---------- 短草（随玩家移动的实例化草丛，风吹摆动） ---------- */
+-const GR_N=Q.low?2500:6000,GR_R=26;
++const GR_N=Q.min?0:Q.low?2500:6000,GR_R=26;
+ const bladeGeo=(()=>{const g=new THREE.BufferGeometry(),w=.045,h=.26;const v=[-w,0,0,w,0,0,0,h,0, 0,0,-w,0,0,w,0,h,0];const c=[];const base=new THREE.Color('#5f9e3e'),tip=new THREE.Color('#8fc25e');
+   for(let i=0;i<6;i++){const t=i%3===2?tip:base;c.push(t.r,t.g,t.b)}g.setAttribute('position',new THREE.Float32BufferAttribute(v,3));g.setAttribute('color',new THREE.Float32BufferAttribute(c,3));g.setAttribute('normal',new THREE.Float32BufferAttribute([0,1,0,0,1,0,0,1,0,0,1,0,0,1,0,0,1,0],3));return g})();
+ const grassMat=new THREE.MeshStandardMaterial({vertexColors:true,side:THREE.DoubleSide,roughness:.9,color:CH===2&&REGD.grass||'#ffffff'});
+@@ -345,7 +346,7 @@
+   grass.count=n;grass.instanceMatrix.needsUpdate=true;refreshFlowers(px,pz)}
+ 
+ /* ---------- 野花（跟着玩家刷新，颜色随机） ---------- */
+-const FL_N=Q.low?250:600;const flowers=new THREE.InstancedMesh(merged([[new THREE.CylinderGeometry(.008,.01,.22,4),M4(0,.11)],[new THREE.IcosahedronGeometry(.055,0),M4(0,.23,0,0,1,.55,1)]]),new THREE.MeshStandardMaterial({color:'#ffffff',roughness:.7}),FL_N);flowers.castShadow=false;scene.add(flowers);if(CH===2&&REGD.noFlower)flowers.visible=false;
++const FL_N=Q.min?0:Q.low?250:600;const flowers=new THREE.InstancedMesh(merged([[new THREE.CylinderGeometry(.008,.01,.22,4),M4(0,.11)],[new THREE.IcosahedronGeometry(.055,0),M4(0,.23,0,0,1,.55,1)]]),new THREE.MeshStandardMaterial({color:'#ffffff',roughness:.7}),FL_N);flowers.castShadow=false;scene.add(flowers);if(CH===2&&REGD.noFlower)flowers.visible=false;
+ const FL_C=['#ffffff','#ffe04a','#c890ff','#ff8ab8','#7ab4ff','#ffb04a'].map(c=>new THREE.Color(c));
+ function refreshFlowers(px,pz){let n=0;for(let i=0;i<FL_N*3&&n<FL_N;i++){const x=px+(Math.random()*2-1)*GR_R,z=pz+(Math.random()*2-1)*GR_R,y=H(x,z);if(y<1.6||y>12)continue;const zn=zoneOf(x,z);if(zn==='market'||zn==='enemy'||zn==='home')continue;if(nearRoad(x,z)<2.5)continue;
+   _m.compose(_v.set(x,y,z),_q.setFromEuler(_e.set(0,Math.random()*3,0)),_s.setScalar(.8+Math.random()*.6));flowers.setMatrixAt(n,_m);flowers.setColorAt(n,FL_C[(Math.random()*FL_C.length)|0]);n++}flowers.count=n;flowers.instanceMatrix.needsUpdate=true;if(flowers.instanceColor)flowers.instanceColor.needsUpdate=true}
+@@ -353,10 +354,10 @@
+ const FXK=CH===2?REGD.fx:'petal';
+ const FXS={petal:['#ffc2d4','#5a2a34',.25,.09,.06,'fall',150],wisp:['#ffffff','#ffffff',.6,.07,.07,'hover',120],snow:['#ffffff','#e0f0ff',.5,.06,.06,'snow',420],leaf:['#e87a2a','#6a2a10',.3,.13,.09,'fall',180],
+   dust:['#e8d0a0','#5a4a30',.3,.05,.05,'wind',260],ash:['#ff8a30','#ff4010',1.4,.05,.05,'rise',220],firefly:['#d0ff80','#a0ff40',2,.05,.05,'hover',90],neon:['#ff40d0','#20e0ff',1.6,.05,.05,'hover',140],gold:['#ffe080','#ffc040',1.2,.06,.06,'rise',160]}[FXK];
+-const PET_N=FXS[6];const petals=new THREE.InstancedMesh(new THREE.PlaneGeometry(FXS[3],FXS[4]),new THREE.MeshStandardMaterial({color:FXS[0],side:THREE.DoubleSide,roughness:.6,emissive:FXS[1],emissiveIntensity:FXS[2]}),PET_N);petals.frustumCulled=false;
++const PET_N=Q.min?0:FXS[6];const petals=new THREE.InstancedMesh(new THREE.PlaneGeometry(FXS[3],FXS[4]),new THREE.MeshStandardMaterial({color:FXS[0],side:THREE.DoubleSide,roughness:.6,emissive:FXS[1],emissiveIntensity:FXS[2]}),PET_N);petals.frustumCulled=false;
+ if(FXK==='neon'){const cc=new THREE.Color();for(let i=0;i<PET_N;i++){petals.setColorAt(i,cc.set(i%2?'#ff40d0':'#20e0ff'))}}
+ scene.add(petals);const petalS=Array.from({length:PET_N},()=>({x:rnd(-14,14),y:rnd(0,9),z:rnd(-14,14),vx:rnd(-.3,.3),vy:rnd(.4,.9),ph:rnd(0,6),r:rnd(0,6)}));
+ /* ---------- 雨 ---------- */
+-const RAIN_N=Q.low?500:1100;const rainGeo=new THREE.BufferGeometry();rainGeo.setAttribute('position',new THREE.Float32BufferAttribute(new Float32Array(RAIN_N*6),3));
++const RAIN_N=Q.min?250:Q.low?500:1100;const rainGeo=new THREE.BufferGeometry();rainGeo.setAttribute('position',new THREE.Float32BufferAttribute(new Float32Array(RAIN_N*6),3));
+ const rain=new THREE.LineSegments(rainGeo,new THREE.LineBasicMaterial({color:'#cfe0ea',transparent:true,opacity:.55}));rain.frustumCulled=false;scene.add(rain);
+ const rainS=Array.from({length:RAIN_N},()=>[rnd(-25,25),rnd(0,22),rnd(-25,25)]);
+--- /tmp/bk_r1/p4_game.js	2026-11-24 21:09:34.552030357 +0800
++++ p4_game.js	2026-11-24 21:18:10.393725931 +0800
+@@ -200,9 +200,9 @@
+ 
+ // 当前可以互动的目标（显示在「互动」按钮上）
+ function nearWater(){if(WATER_Y-groundAt(P.x,P.z)>.15)return true;const fx=Math.sin(P.yaw),fz=Math.cos(P.yaw);for(const r of[1.2,2.2]){if(WATER_Y-groundAt(P.x+fx*r,P.z+fz*r)>.25)return true}return false}
+-function findInteract(){if(G.dead||G.over)return null;let best=null,bd=1e9;const cand=(d,label,fn)=>{if(d<bd){bd=d;best={label,fn}}};
+-  for(const n of nodes){if(!n.alive||n.kind==='rock')continue;const d=(n.x-P.x)**2+(n.z-P.z)**2;if(d<(n.kind==='berry'?3.4:2.4)**2)cand(d,{stick:'捡树枝',pebble:'捡石子',herb:'采灵草',berry:'摘浆果'}[n.kind],()=>pick(n))}
+-  for(const a of ACT){if(!a.dead||!a.loot)continue;const d=(a.x-P.x)**2+(a.z-P.z)**2;if(d<2.8**2)cand(d,'剥取'+a.name,()=>{a.loot=false;const l={meat:a.def.meat};if(a.def.hide)l.hide=a.def.hide;give(l);play(P.model,'gather',.7);toast('得到 '+fmtCost(l));a.deadT=999})}
++function findInteract(){if(G.dead||G.over)return null;let best=null,bd=1e9;const cand=(d,label,fn,pos)=>{if(d<bd){bd=d;best={label,fn,pos}}};
++  for(const n of nodes){if(!n.alive||n.kind==='rock')continue;const d=(n.x-P.x)**2+(n.z-P.z)**2;if(d<(n.kind==='berry'?3.4:2.4)**2)cand(d,{stick:'捡树枝',pebble:'捡石子',herb:'采灵草',berry:'摘浆果'}[n.kind],()=>pick(n),n)}
++  for(const a of ACT){if(!a.dead||!a.loot)continue;const d=(a.x-P.x)**2+(a.z-P.z)**2;if(d<2.8**2)cand(d,'剥取'+a.name,()=>{a.loot=false;const l={meat:a.def.meat};if(a.def.hide)l.hide=a.def.hide;give(l);play(P.model,'gather',.7);toast('得到 '+fmtCost(l));a.deadT=999},a)}
+   for(const b of G.builds){const d=(b.x-P.x)**2+(b.z-P.z)**2;
+     if(b.t==='fire'&&d<3.2**2){if((G.inv.meat||0)>0)cand(d-.1,'烤肉×'+G.inv.meat,()=>{P.lock=1.3;P.st='kneel';P.yaw=Math.atan2(b.x-P.x,b.z-P.z);later(1.2,()=>{const n=G.inv.meat;G.inv.meat=0;give({cooked:n});toast('烤好了 烤肉+'+n);G.flags.cook=1;gainXP(3)})});else cand(d,'坐下烤火',()=>{P.sitFire=b;P.yaw=Math.atan2(b.x-P.x,b.z-P.z);G.timeScale=6;toast('坐在火边歇息：时间流逝加快，体力恢复。动一下就起身')})}
+     if(b.t==='shelter'&&d<3.4**2)cand(d,'睡觉',()=>sleep(b));
+@@ -215,12 +215,12 @@
+     if(fu){const d=(fu.x-P.x)**2+(fu.z-P.z)**2;if(d<3.2**2)cand(d,A?'丹炉：炼聚气丹':'改造台：灵能充能',()=>brewPill())}
+     if(cs&&!G.flags.chest){const d=(cs.x-P.x)**2+(cs.z-P.z)**2;if(d<3**2)cand(d,ACT.some(a=>a.guard2&&!a.dead)?'先打败守山灵兽':'打开秘境宝箱',()=>openChest())}}
+   extraInteract(cand);
+-  if(G.merchant){const d=(G.merchant.x-P.x)**2+(G.merchant.z-P.z)**2;if(d<3.5**2)cand(d,'和商人交易',()=>{G.flags.merchant=1;ui.trade()})}
++  if(G.merchant){const d=(G.merchant.x-P.x)**2+(G.merchant.z-P.z)**2;if(d<3.5**2)cand(d,'和商人交易',()=>{G.flags.merchant=1;ui.trade()},G.merchant)}
+   if(!best&&G.tools.canteen&&G.water<3&&nearWater())best={label:'打水',fn:()=>{G.water=3;play(P.model,'gather',.7);toast('水壶装满了（可浇 3 次）')}};
+   return best}
+ function pick(n){n.alive=false;setNode(n,false);gainXP(n.kind==='herb'?2:1);play(P.model,'gather',.6);P.lock=.45;let l;
+   if(n.kind==='stick')l={wood:1};if(n.kind==='pebble')l={stone:1};if(n.kind==='herb')l={herb:1};if(n.kind==='berry'){l={berry:3};if(Math.random()<.3)l.seed=1}
+-  give(l);toast('得到 '+fmtCost(l));RESP.push({t:n.kind==='berry'?160:120+Math.random()*120,fn:function f(){if(dist2(n)<400){RESP.push({t:20,fn:f});return}n.alive=true;setNode(n,true)}})}
++  give(l);pickFX(n,l);const qs=GUIDE.step;toast('得到 '+fmtCost(l)+(qs&&qs.id==='gather'&&qs.prog?'（'+qs.prog()+'）':qs&&qs.id==='fire'&&qs.prog?'（篝火需要 '+qs.prog()+'）':''));RESP.push({t:n.kind==='berry'?160:120+Math.random()*120,fn:function f(){if(dist2(n)<400){RESP.push({t:20,fn:f});return}n.alive=true;setNode(n,true)}})}
+ function sleep(b){const night=G.hour>=18||G.hour<5;if(!night){toast('天还亮着，18 点以后才能睡（坐在篝火边可以让时间过得快些）');return}
+   if(ACT.some(a=>!a.dead&&(a.angry||a.kind==='wolf'||a.human)&&Math.hypot(a.x-P.x,a.z-P.z)<16)){toast('附近有危险，睡不着！');return}
+   P.st='sleep';P.x=b.x;P.z=b.z;P.yaw=b.ry+Math.PI/2;P.sitFire=null;G.timeScale=1;$('#fade').classList.add('on');
+@@ -325,20 +325,7 @@
+   try{writeSave(s);sessionStorage.setItem('td5_auto','1')}catch(e){}location.reload()}
+ 
+ /* ---------- 任务提示 ---------- */
+-function quest(){if(CH===2)return quest2();const f=G.flags,i=G.inv,fa=G.faction;
+-  const steps=[
+-    [()=>G.tools.axe||(i.wood>=2&&i.stone>=2),'在营地附近捡树枝和石子（木头2 石头2）'],
+-    [()=>G.tools.axe,'打开「制造」，做一把石斧'],
+-    [()=>f.chop>=2||f.b_fire,'对着树按「攻击」砍树（砍倒 2 棵）'],
+-    [()=>f.b_fire,'制造「篝火」（木4 石3）'],
+-    [()=>f.cook||f.harvest,'打猎（野猪/鹿/兔），在篝火边烤肉'],
+-    [()=>f.b_shelter,'搭一个「庇护所」（木12），天黑后去睡觉'],
+-    [()=>f.merchant,'去「坊市」找商人（地图上的🏮）'],
+-    [()=>f.water,'做种植田和水壶，播种后打水浇地'],
+-    [()=>fa==='A'?G.tools.sword:G.tools.bow,fa==='A'?'炼一把「灵剑」（需要灵草）':'做一把「弩」和弩箭'],
+-    [()=>G.cleared.mid||G.builds.some(b=>b.t==='boat'),'击败敌营首领「'+FACTION[fa].boss+'」，或在灵河渡口造灵舟，打通九州航线'],
+-    [()=>false,'去灵河渡口登上灵舟，打开航线图，前往'+regName(ROUTE()[1])]];
+-  for(let k=0;k<steps.length;k++)if(!steps[k][0]())return{n:k+1,all:steps.length,t:steps[k][1]};return{n:steps.length,all:steps.length,t:'完成'}}
++function quest(){return CH===2?quest2():questFull()}   // 第一章任务链见 p7_guide.js（新手引导 + 主线）
+ 
+ function openChest(){const c=CH2OBJ.chest;if(ACT.some(a=>a.guard2&&!a.dead)){toast('守山灵兽还在，先打败它们');return}
+   G.flags.chest=1;c.lid.rotation.x=-1.9;c.glow.visible=false;const l={ling:5,herb:4,potion:1,fu:2};if(REGD.mat)l[regMat(REGK)]=4;give(l);gainQi(60);burst(c.x,c.obj.position.y+1,c.z,MAT.crystal,18,3);
+@@ -373,7 +360,7 @@
+ function gainXP(n){if(G.over||!G.started)return;G.xp+=n;ftxt(P.x,P.y+2.3,P.z,'+'+n+' 经验','xp');let up=0;while(G.lv<50&&G.xp>=needXP(G.lv)){G.xp-=needXP(G.lv);G.lv++;G.pts+=2;up++}
+   if(up){const r=G.hp/G.maxhp;applyOrigin();G.hp=G.maxhp;G.sta=G.maxsta;if(G.maxmana)G.mana=G.maxmana;burst(P.x,P.y+1,P.z,MAT.gold,18,3);ftxt(P.x,P.y+2.8,P.z,'升级！','lvup');
+     toast('升级了！'+rankName()+'：生命体力回满，获得 '+(2*up)+' 个属性点（点左上角「加点」）',1);save()}}
+-async function startGame(fac,origin,sv){try{await grokPreload()}catch(e){}
++async function startGame(fac,origin,sv){G.starting=true;try{await grokPreload()}catch(e){}
+   G.faction=fac;G.origin=origin;G.realm=sv&&sv.realm||0;G.lv=sv&&sv.lv||1;G.xp=sv&&sv.xp||0;G.pts=sv&&sv.pts||0;G.st=Object.assign({str:0,vit:0,agi:0,spi:0},sv&&sv.st||{});Object.assign(G,{qi:sv&&sv.qi||0,wtier:sv&&sv.wtier||0,cleared:sv&&sv.cleared||{},bases:sv&&sv.bases||{},rflags:sv&&sv.rflags||{},perks:sv&&sv.perks||{},skillSel:sv&&sv.skillSel||'base'});applyOrigin();G.hp=G.maxhp;G.sta=G.maxsta;G.mana=G.maxmana;G.inv={};G.tools={};
+   buildCamp('home',fac,false);buildCamp('enemy',FACTION[fac].foe,true);bakeAll();
+   P.x=ZONES.home.x+3;P.z=ZONES.home.z+4;P.yaw=Math.PI*.6;
+@@ -386,7 +373,7 @@
+   equip(sv&&sv.weapon&&(sv.weapon==='fist'||G.tools[sv.weapon])?sv.weapon:'fist');
+   P.y=groundAt(P.x,P.z);refreshGrass(P.x,P.z);G.started=true;G.raidDay=G.hour>=20?G.day:0;if(!sv)save();
+   if(CH===2&&sv&&sv.x==null){save();toast(REGK==='tx'?'你登上了天墟·九州之巅。天道化身就在天宫之中……':'灵舟靠岸，你来到了'+REGD.n+'。'+(G.cleared[REGK]?'这里已经平定。':'这里被「'+bossName()+'」把持，先去'+ZONES.market.name+'打听消息'),1);return}
+-  toast(sv?'读取存档：第 '+G.day+' 天'+(CH===2?'（第二章 · '+ORIGINS[fac][origin]+'）':''):'你是来自'+ORIGINS[fac][origin]+'的'+FACTION[fac].n+'，流落到中州·灵河界。先在营地附近捡些树枝和石子吧',1)}
++  toast(sv?'读取存档：第 '+G.day+' 天'+(CH===2?'（第二章 · '+ORIGINS[fac][origin]+'）':''):'你是来自'+ORIGINS[fac][origin]+'的'+FACTION[fac].n+'，流落到中州·灵河界。你在「我方营地」，地上发光的就是树枝和石子，先捡几样吧',1)}
+ async function useGLB(buf,flip,quiet){const w=await buildGLBHero(buf.slice(0),flip);const old=P.model;if(old){scene.remove(old)}P.model=w;scene.add(w);P.glider=mkGlider();w.add(P.glider);
+   if(w.rig){w.rig.propKey=null;setProp(w,WEAPONS[G.weapon].prop);if(!quiet)toast('模型已替换：它没有自带骨骼和动作，已自动绑骨，用游戏内置动作驱动',1);return{names:['（没有自带动作：已自动绑骨，用内置的走、跑、跳、游泳、滑翔、攻击、坐、睡动作）'],acts:{}}}
+   if(G.started||quiet)attachGLBProp(WEAPONS[G.weapon].prop);const g=w.glb;const miss=['idle','walk','run','jump','swim','glide','attack'].filter(k=>!g.acts[k]);
+--- /tmp/bk_r1/p5_ui.js	2026-11-24 21:09:34.552055708 +0800
++++ p5_ui.js	2026-11-24 21:17:54.638796829 +0800
+@@ -59,7 +59,7 @@
+ tap('actB',()=>{const t=findInteract();if(t&&!busy())t.fn()});
+ tap('skillB',()=>skill());tap('eatB',()=>eat());tap('wpnB',()=>nextWeapon());
+ tap('runB',()=>{runLock=!runLock;el('runB').classList.toggle('lit',runLock);if(joy.id===null)IN.run=runLock});
+-tap('craftB',()=>{drawCraft();panel('craft',true)});tap('mapB',()=>{draw9();panel('map9',true)});tap('setB',()=>{drawSet();panel('set',true)});
++tap('craftB',()=>{if(GUIDE.tab)craftTab=GUIDE.tab;drawCraft();panel('craft',true)});tap('mapB',()=>{draw9();panel('map9',true)});tap('setB',()=>{drawSet();panel('set',true)});
+ /* 键盘 */
+ const K={};addEventListener('keydown',e=>{if(e.repeat&&e.code!=='Space')return;K[e.code]=true;if(!G.started)return;
+   if(e.code==='Space'){IN.jump=!e.repeat;IN.jumpHeld=true;e.preventDefault()}
+@@ -80,7 +80,7 @@
+   el('ctabs').innerHTML=['tool','build'].map(t=>`<button class="${t===craftTab?'sel':''}" data-t="${t}">${t==='tool'?'工具 · 武器 · 药':'建造'}</button>`).join('');
+   el('ctabs').querySelectorAll('button').forEach(b=>b.onclick=()=>{craftTab=b.dataset.t;drawCraft()});
+   el('clist').innerHTML=list.map(r=>{const own=r.k==='tool'&&G.tools[r.id];const ok=has(r.cost)&&!own;
+-    return `<div class="rc ${ok?'ok':''}"><div><b>${r.n}</b>${own?' <em>已拥有</em>':''}<small>${r.d}</small><span>${Object.entries(r.cost).map(([k,v])=>`<i class="${(G.inv[k]||0)>=v?'':'no'}">${ITEM[k]} ${G.inv[k]||0}/${v}</i>`).join('')}</span></div><button data-id="${r.id}" ${ok?'':'disabled'}>${r.k==='build'?'建造':'制造'}</button></div>`}).join('');
++    return `<div class="rc ${ok?'ok':''} ${GUIDE.rec===r.id?'hl':''}"><div><b>${r.n}</b>${own?' <em>已拥有</em>':''}<small>${r.d}</small><span>${Object.entries(r.cost).map(([k,v])=>`<i class="${(G.inv[k]||0)>=v?'':'no'}">${ITEM[k]} ${G.inv[k]||0}/${v}</i>`).join('')}</span></div><button data-id="${r.id}" ${ok?'':'disabled'}>${r.k==='build'?'建造':'制造'}</button></div>`}).join('');
+   el('clist').querySelectorAll('button').forEach(b=>b.onclick=()=>{const r=RECIPES.find(x=>x.id===b.dataset.id);if(r.k==='build'){panel('craft',false);craft(r.id)}else{craft(r.id);drawCraft()}});
+   el('cinv').innerHTML=Object.entries(G.inv).filter(([k,v])=>v>0).map(([k,v])=>`<i>${ITEM[k]} ${v}</i>`).join('')||'<i>背包是空的</i>'}
+ ui.trade=()=>{const draw=()=>{el('tlist').innerHTML=TRADES.filter(t=>!t.f||t.f===G.faction).map((t,i)=>`<div class="rc ${has(t.give)?'ok':''}"><div><b>${t.n}</b><span><i>付 ${fmtCost(t.give)}</i></span></div><button data-i="${TRADES.indexOf(t)}" ${has(t.give)?'':'disabled'}>交易</button></div>`).join('');
+@@ -88,8 +88,8 @@
+   el('tinv').textContent='你有：灵石 '+(G.inv.ling||0)+'　浆果 '+(G.inv.berry||0)+'　兽皮 '+(G.inv.hide||0)};draw();panel('trade',true)};
+ function draw9(){const cur=G.started?ORIGINS[G.faction][G.origin]:'';const cell=(n,cls)=>`<div class="zh ${cls} ${n===cur?'me':''}">${n}${n===cur?'<small>故乡</small>':''}</div>`;
+   el('nine').innerHTML=`<div class="row">${['上云州','上玄州','上天州','上仙州'].map(n=>cell(n,'up')).join('')}</div><div class="row">${cell('中州','mid')}</div><div class="row">${['下云州','下玄州','下天州','下仙州'].map(n=>cell(n,'down')).join('')}</div>`}
+-function drawSet(){el('qBtn').textContent='画质：'+(Q.low?'流畅（省电）':'高清');}
+-el('qBtn').onclick=()=>{try{localStorage.setItem('td5_q',Q.low?'high':'low')}catch(e){}save();location.reload()};
++function drawSet(){el('qBtn').textContent='画质：'+qualityLabel(Q.tier)+'（点击切换）';}
++el('qBtn').onclick=()=>{const nx={high:'low',low:'min',min:'high'}[Q.tier];try{localStorage.setItem('td5_q',nx)}catch(e){}save();try{if(G.started)sessionStorage.setItem('td5_auto','1')}catch(e){}location.reload()};
+ el('saveBtn').onclick=()=>{save();toast('已存档')};
+ function quitGame(){if(!G.dead&&!G.over)save();try{sessionStorage.removeItem('td5_auto');sessionStorage.removeItem('td5_new')}catch(e){}location.reload()}
+ el('quitBtn').onclick=quitGame;el('quitB').onclick=()=>{if(confirmQuit())quitGame()};
+@@ -145,10 +145,10 @@
+     c.font='bold '+Math.round(12.5*sc)+'px "PingFang SC","Microsoft YaHei",sans-serif';c.lineWidth=3.5*sc;c.strokeStyle='rgba(255,255,255,.95)';c.strokeText(Z.name,x,y+15*sc);c.fillStyle='#1e2a30';c.fillText(Z.name,x,y+15*sc)}
+   const [px,pz]=tp(P.x,P.z),s=(full?11:10)*sc;c.save();c.translate(px,pz);c.rotate(-P.yaw+Math.PI);c.fillStyle='#ffe14a';c.strokeStyle='#1a1a1a';c.lineWidth=2*sc;c.beginPath();c.moveTo(0,-s);c.lineTo(s*.7,s*.75);c.lineTo(0,s*.35);c.lineTo(-s*.7,s*.75);c.closePath();c.fill();c.stroke();c.restore()}
+ function drawMini(){if(!mmBase)bakeMini();const S=mm.width,R=75,k=MB/(2*MR);mx.fillStyle='#3a8ab8';mx.fillRect(0,0,S,S);
+-  mx.drawImage(mmBase,(P.x-R+MR)*k,(P.z-R+MR)*k,2*R*k,2*R*k,0,0,S,S);mapMarks(mx,(x,z)=>[(x-P.x+R)/(2*R)*S,(z-P.z+R)/(2*R)*S],S/190,false);
++  mx.drawImage(mmBase,(P.x-R+MR)*k,(P.z-R+MR)*k,2*R*k,2*R*k,0,0,S,S);mapMarks(mx,(x,z)=>[(x-P.x+R)/(2*R)*S,(z-P.z+R)/(2*R)*S],S/190,false);guideMini(mx,(x,z)=>[(x-P.x+R)/(2*R)*S,(z-P.z+R)/(2*R)*S],S/190,S,false);
+   mx.font='bold 20px sans-serif';mx.fillStyle='#fff';mx.strokeStyle='#000';mx.lineWidth=3;mx.strokeText('北',16,16);mx.fillText('北',16,16)}
+ function drawBig(){if(!mmBase)bakeMini();const c=el('bm'),S=Math.round(Math.min(innerWidth*.92,innerHeight*.78,700)*Math.min(2,devicePixelRatio||1));c.width=c.height=S;const x=c.getContext('2d'),V=215,k=MB/(2*MR);
+-  x.drawImage(mmBase,(MR-V)*k,(MR-V)*k,2*V*k,2*V*k,0,0,S,S);mapMarks(x,(wx,wz)=>[(wx+V)/(2*V)*S,(wz+V)/(2*V)*S],S/420,true)}
++  x.drawImage(mmBase,(MR-V)*k,(MR-V)*k,2*V*k,2*V*k,0,0,S,S);mapMarks(x,(wx,wz)=>[(wx+V)/(2*V)*S,(wz+V)/(2*V)*S],S/420,true);guideMini(x,(wx,wz)=>[(wx+V)/(2*V)*S,(wz+V)/(2*V)*S],S/420,S,true)}
+ mm.addEventListener('click',()=>{if(!G.started)return;drawBig();panel('bigmap',true)});
+ /* ---------- HUD ---------- */
+ let hudT=0,lastZone='';
+@@ -156,14 +156,14 @@
+   el('hpF').style.width=(G.hp/G.maxhp*100)+'%';el('hungerF').style.width=G.hunger+'%';el('staF').style.width=(G.sta/G.maxsta*100)+'%';if(G.maxmana)el('manaF').style.width=(G.mana/G.maxmana*100)+'%';
+   el('hpV').textContent=Math.ceil(G.hp);el('hungerV').textContent=Math.ceil(G.hunger);
+   if(toastT>0){toastT-=dt;if(toastT<=0)el('toast').classList.remove('on')}
+-  const it=findInteract();const ab=el('actB');ab.textContent=it?it.label:'互动';ab.classList.toggle('lit',!!it);
++  const it=findInteract();GUIDE.it=it;const ab=el('actB');ab.textContent=it?it.label:'互动';ab.classList.toggle('lit',!!it);
+   if(hudT>0)return;hudT=.25;{const sb=el('stats').getBoundingClientRect();el('quest').style.top=(sb.bottom+6)+'px';if(innerWidth>720){el('inv').style.left=(sb.right+8)+'px';el('inv').style.right=(el('mmw').getBoundingClientRect().width+24)+'px'}}
+   const hh=Math.floor(G.hour),mi=Math.floor((G.hour-hh)*60);el('clock').textContent=`第${G.day}天 ${String(hh).padStart(2,'0')}:${String(mi).padStart(2,'0')} ${G.rain?'🌧':G.hour>=6&&G.hour<18.5?'☀':'🌙'}`;
+   const zn=zoneOf(P.x,P.z);const zname=zn?ZONES[zn].name:(WATER_Y-groundAt(P.x,P.z)>.5?(REGD.wat==='lava'?'岩浆中':'水中'):REGD.n);el('zone').textContent=zname;if(zn&&zn!==lastZone){toast('来到 '+ZONES[zn].name);if(zn==='market')G.flags.visitM=1}lastZone=zn||'';
+-  const q=quest();if(G._qn&&q.n>G._qn&&!G.over){gainXP(40);toast('目标完成！经验 +40')}G._qn=q.n;el('quest').innerHTML=`<b>目标 ${q.n}/${q.all}</b>${q.t}`;
++  guideTick();
+   el('qiF').style.width=Math.min(100,(G.qi||0)/qiNeed()*100)+'%';el('qiV').textContent=Math.floor(G.qi||0);el('skillB').textContent=SKILLS[G.skillSel]?SKILLS[G.skillSel].n():'技能';el('medB').classList.toggle('lit',!!G.med);el('swB').style.display=G.realm>=1?'':'none';
+   el('lvT').textContent=rankName();el('xpF').style.width=(G.xp/needXP(G.lv)*100)+'%';el('ptsB').textContent=G.pts>0?'加点 +'+G.pts:'人物';el('ptsB').classList.toggle('lit',G.pts>0);
+-  el('inv').innerHTML=['wood','stone','herb','meat','cooked','berry','ling'].map(k=>`<i>${ITEM[k]}<b>${G.inv[k]||0}</b></i>`).join('')+(G.tools.canteen?`<i>水壶<b>${G.water}/3</b></i>`:'')+(G.faction==='B'&&G.tools.bow?`<i>弩箭<b>${G.inv.arrow||0}</b></i>`:'')+((G.inv.potion||0)?`<i>药<b>${G.inv.potion}</b></i>`:'');
++  el('inv').innerHTML=['wood','stone','herb','meat','cooked','berry','ling'].map(k=>`<i class="${invFlash(k)?'fl':''}">${ITEM[k]}<b>${G.inv[k]||0}</b></i>`).join('')+(G.tools.canteen?`<i>水壶<b>${G.water}/3</b></i>`:'')+(G.faction==='B'&&G.tools.bow?`<i>弩箭<b>${G.inv.arrow||0}</b></i>`:'')+((G.inv.potion||0)?`<i>药<b>${G.inv.potion}</b></i>`:'');
+   el('wpn').textContent=WEAPONS[G.weapon].n;drawMini();
+   el('fps').textContent=Math.round(fpsV)+' fps'}
+ 
+@@ -210,7 +210,7 @@
+ const clock=new THREE.Clock();let fpsV=60,fpsN=0,fpsT=0,simT=0;
+ function resize(){const w=innerWidth,h=innerHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix()}addEventListener('resize',resize);resize();
+ function frame(){requestAnimationFrame(frame);let dt=Math.min(clock.getDelta(),.05);fpsN++;fpsT+=dt;if(fpsT>.5){fpsV=fpsN/fpsT;fpsN=0;fpsT=0}
+-  if(!G.started){CAM.yaw+=dt*.05;const t=performance.now()/1000;P.x=ZONES.market.x;P.z=ZONES.market.z;P.y=groundAt(P.x,P.z);updSky(0);updCam(dt);WU.uTime.value=t;GU.uTime.value=t;renderer.render(scene,camera);return}
++  if(!G.started){CAM.yaw+=dt*.05;const t=performance.now()/1000;if(!G.starting){P.x=ZONES.market.x;P.z=ZONES.market.z}P.y=groundAt(P.x,P.z);updSky(0);updCam(dt);WU.uTime.value=t;GU.uTime.value=t;renderer.render(scene,camera);return}
+   const run=!G.paused;simT+=run?dt:0;
+   if(run){keyMove();if(atkHold)attack();
+     const ts=G.timeScale;G.hour+=dt*24/DAY_LEN*ts;if(G.hour>=24){G.hour-=24;G.day++}
+@@ -224,6 +224,6 @@
+     if(!G.over)updPlayer(dt);for(let i=ACT.length-1;i>=0;i--)if(ACT[i])updActor(ACT[i],dt);updProj(dt);updChips(dt);updRaid();updExtra(dt);
+     for(let i=FX_RINGS.length-1;i>=0;i--)if(FX_RINGS[i].upd(dt))FX_RINGS.splice(i,1);
+     G.played+=dt;if(G.played>90){G.played=0;if(!G.dead&&!G.over)save()}}
+-  updSky(dt);updDyn(dt,simT);updCam(dt);updFX(dt);updHUD(dt);renderer.render(scene,camera)}
++  updSky(dt);updDyn(dt,simT);updCam(dt);updFX(dt);updHUD(dt);updGuide(dt,simT);renderer.render(scene,camera)}
+ frame();el('loading').style.display='none';el('start').style.display='';
+ window.__game={spawnGhost,gainXP,drawStat,G,P,CAM,IN,ACT,nodes,trees,attack,skill,eat,craft,findInteract,startGame,go,save,importGLB,useGLB,renderer,scene,camera,THREE,spawnBeast,hurtActor,ending,equip,ZONES,groundAt,H,WATER_Y,riverX,panel};
+--- /tmp/bk_r1/shell.html	2026-11-24 21:09:35.911361327 +0800
++++ shell.html	2026-11-24 21:24:04.353084775 +0800
+@@ -12,6 +12,20 @@
+ #loading b{font-size:34px;letter-spacing:6px;color:#2f6f8a}
+ /* 开始界面 */
+ #rot{display:none;position:fixed;inset:0;z-index:99;background:#1d3442;color:#fff;font-size:20px;align-items:center;justify-content:center;flex-direction:column;gap:14px;text-align:center}#rot b{font-size:56px;display:inline-block;animation:rr 1.6s ease-in-out infinite}@keyframes rr{50%{transform:rotate(90deg)}}@media (orientation:portrait) and (pointer:coarse){#rot{display:flex}}
++#wp{position:absolute;left:50%;top:calc(52px + env(safe-area-inset-top));transform:translateX(-50%);display:flex;align-items:center;gap:8px;padding:5px 14px 5px 8px;border-radius:20px;background:rgba(30,42,52,.78);color:#fff;font-size:14px;font-weight:700;pointer-events:none;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.25)}
++#wp .ar{display:inline-block;width:26px;height:26px;line-height:26px;text-align:center;border-radius:50%;background:#ffd23a;color:#5a3a00;font-size:16px;transition:transform .12s}
++#ip{position:absolute;left:0;top:0;padding:4px 10px;border-radius:12px;background:rgba(255,250,236,.95);color:#5a3a10;font-size:13px;font-weight:800;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.3);pointer-events:none}
++#ip i{font-style:normal;display:inline-block;margin-right:6px;padding:0 6px;border-radius:6px;background:#f0a020;color:#fff}
++#qdone{position:absolute;left:50%;top:calc(96px + env(safe-area-inset-top));transform:translate(-50%,-12px);min-width:min(320px,80vw);max-width:86vw;padding:10px 18px;border-radius:16px;background:linear-gradient(#fff7df,#ffe9b0);color:#5a3a10;text-align:center;box-shadow:0 4px 16px rgba(0,0,0,.3);border:2px solid #f0b030;opacity:0;pointer-events:none;transition:opacity .3s,transform .3s}
++#qdone.on{opacity:1;transform:translate(-50%,0)}#qdone .h{font-size:17px;font-weight:900;color:#2f8a2f}#qdone .r{font-size:14px;margin-top:3px}#qdone .n{font-size:13px;margin-top:4px;color:#7a5a30}
++#quest .qp{margin-top:2px;font-weight:800;color:#2a6a9a}#quest .qa{margin-top:3px;font-size:11.5px;color:#4a5a62}#quest .qr{margin-top:3px;font-size:11.5px;color:#a0601a;font-weight:700}
++.ab.hint{animation:pulse 1s infinite;outline:3px solid #ffd23a;outline-offset:2px}
++.rc.hl{opacity:1;outline:3px solid #ffd23a;background:#fffbe8}
++.ft.pick{font-size:17px;color:#fff6c8;text-shadow:0 2px 0 #7a4a10,0 0 4px #000}
++#inv i.fl{animation:invfl .9s}@keyframes invfl{0%{transform:scale(1.35);background:#ffe27a}100%{transform:scale(1)}}
++@media (max-height:480px){#wp{font-size:12.5px;top:calc(40px + env(safe-area-inset-top))}#qdone{top:calc(76px + env(safe-area-inset-top));padding:7px 14px}#qdone .h{font-size:15px}#quest{width:min(340px,44vw)}#quest .qa{font-size:11px}}
++#hud.qdon #toast{bottom:22%}
++@media (max-width:720px){#wp{top:calc(10px + env(safe-area-inset-top))}}
+ #start{position:fixed;inset:0;z-index:40;display:flex;align-items:center;justify-content:center;padding:12px;background:linear-gradient(rgba(190,230,248,.35),rgba(255,246,228,.55))}
+ #start .box{width:min(760px,100%);max-height:100%;overflow:auto;padding:18px 20px}
+ #start h1{margin:0;text-align:center;font-size:38px;letter-spacing:10px;color:#2f6f8a}
+--- /tmp/bk_r1/build.py	2026-11-24 21:09:34.814559312 +0800
++++ build.py	2026-11-24 21:17:54.639073209 +0800
+@@ -1,5 +1,5 @@
+ import base64
+-FILES=['p1_core.js','nat_assets.js','mkt_assets.js','fangshi_assets.js','tex_assets.js','grok_assets.js','gtree_assets.js','p2_world.js','p3_actors.js','p4_game.js','p6_cult.js','p5_ui.js']
++FILES=['p1_core.js','nat_assets.js','mkt_assets.js','fangshi_assets.js','tex_assets.js','grok_assets.js','gtree_assets.js','p2_world.js','p3_actors.js','p4_game.js','p6_cult.js','p7_guide.js','p5_ui.js']
+ s=open('shell.html').read().replace("if(m&&!window.GAME_OK)m.textContent","if(m&&document.getElementById('loading').style.display!=='none')m.textContent")
+ code="\n".join(open(f).read() for f in FILES)
+ hero=base64.b64encode(open('/home/claude/hero/xiushi.glb','rb').read()).decode()
+--- /dev/null	2026-11-24 07:42:40.000573181 +0800
++++ p7_guide.js	2026-11-24 21:24:04.353846305 +0800
+@@ -0,0 +1,98 @@
++/* ---------- 新手引导（第一轮改进）：目标指路、营地光柱、采集物标记、拾取反馈、目标完成提示、画质建议 ---------- */
++// 新手任务的游戏内奖励（只给少量材料/补给，不卖数值）
++const TUT_REW={camp:{berry:3},gather:{wood:1,stone:1},axe:{potion:1},chop:{stone:2},fire:{meat:1},cook:{ling:2}};
++const GUIDE={tgt:null,step:null,flash:{},ipEl:null,wpEl:null,doneEl:null,init:false,lowFps:0,suggested:false};
++const PICK_C={stick:'#ffb347',pebble:'#9fe0ff',herb:'#7dff8a',berry:'#ff7a9a'};
++const PICK_KINDS=new Set(['stick','pebble','herb','berry']);
++function touchUI(){return isTouch}
++function nearestOf(list,ok){let b=null,bd=1e18;for(const n of list){if(!ok(n))continue;const d=(n.x-P.x)**2+(n.z-P.z)**2;if(d<bd){bd=d;b=n}}return b}
++function nearestNode(kinds){return nearestOf(nodes,n=>n.alive&&kinds.includes(n.kind))}
++function nearestTree(){return nearestOf(trees,t=>t.alive&&TREE_TYPES[t.type]&&TREE_TYPES[t.type].wood>0)}
++function nearestFire(){return nearestOf(G.builds,b=>b.t==='fire')}
++function ptTgt(o,label,icon){return o?{x:o.x,z:o.z,label,icon:icon||'✦',small:true}:null}
++function zoneTgt(Z,icon){return Z?{x:Z.x,z:Z.z,label:Z.name,icon:icon||'⛺',zone:true,r:Z.r}:null}
++
++/* ----- 第一章任务链：前 6 步是「新手引导」，后面接原来的主线 ----- */
++function questSteps(){const f=G.flags,i=G.inv,fa=G.faction,T=touchUI(),press=T?'点右下角「互动」':'按 E 键（或点「互动」）';
++  const got=()=>G.tools.axe||((i.wood||0)>=2&&(i.stone||0)>=2);
++  return [
++    {id:'camp',ok:()=>f.camp||got()||f.chop||f.b_fire,t:'前往「我方营地」',act:'跟着屏幕上方的金色箭头走，小地图上有金色虚线。营地有一道金色光柱。',tgt:()=>zoneTgt(ZONES.home,'⛺')},
++    {id:'gather',ok:got,t:'在营地附近捡树枝和石子',prog:()=>`木头 ${Math.min(i.wood||0,2)}/2　石头 ${Math.min(i.stone||0,2)}/2`,act:'地上发<span style="color:#e08a10;font-weight:800">橙光</span>的是树枝，发<span style="color:#2a98d0;font-weight:800">蓝光</span>的是石子。走近后'+press+'捡起。',
++      tgt:()=>{const need=[];if((i.wood||0)<2)need.push('stick');if((i.stone||0)<2)need.push('pebble');const n=nearestNode(need.length?need:['stick','pebble']);if(n&&Math.hypot(n.x-ZONES.home.x,n.z-ZONES.home.z)<60)return ptTgt(n,n.name,n.kind==='stick'?'🪵':'🪨');return zoneTgt(ZONES.home,'⛺')}},
++    {id:'axe',ok:()=>G.tools.axe,t:'做一把石斧',act:'点「制造」→「石斧」（木2 石2），做好会自动拿在手上。',hl:'craftB',rec:'axe',tab:'tool'},
++    {id:'chop',ok:()=>f.chop>=2||f.b_fire,t:'砍倒 2 棵树',prog:()=>`已砍倒 ${Math.min(f.chop||0,2)}/2`,act:'走到树旁，'+(T?'点「攻击」':'按 F 键或点「攻击」')+'连砍几下，树倒了就得到木头。',tgt:()=>ptTgt(nearestTree(),'树','🌳')},
++    {id:'fire',ok:()=>f.b_fire,t:'搭一个篝火',prog:()=>`木头 ${Math.min(i.wood||0,4)}/4　石头 ${Math.min(i.stone||0,3)}/3`,act:'材料够了就点「制造」→「建造」→「篝火」，会建在你面前。',hl:'craftB',rec:'fire',tab:'build',
++      tgt:()=>(i.stone||0)<3?ptTgt(nearestNode(['pebble']),'石子','🪨'):(i.wood||0)<4?ptTgt(nearestTree(),'树','🌳'):null},
++    {id:'cook',ok:()=>f.cook||f.harvest,t:'在篝火边烤肉',act:(i.meat||0)>0?'带着生肉走到篝火旁，'+press+'「烤肉」。':'先打猎（兔、鹿、野猪）得到生肉，再到篝火旁烤。',
++      tgt:()=>(i.meat||0)>0?ptTgt(nearestFire(),'篝火','🔥'):ptTgt(nearestOf(ACT,a=>!a.dead&&a.def&&a.def.flee&&!a.human),'猎物','🦌')},
++    {id:'shelter',ok:()=>f.b_shelter,t:'搭一个「庇护所」（木12），天黑后去睡觉'},
++    {id:'merchant',ok:()=>f.merchant,t:'去「坊市」找商人（地图上的🏮）',act:'跟着金色箭头走，到商人旁边点「和商人交易」。',tgt:()=>G.merchant?{x:G.merchant.x,z:G.merchant.z,label:'坊市商人',icon:'🏮',zone:true,r:6}:zoneTgt(ZONES.market,'🏮')},
++    {id:'water',ok:()=>f.water,t:'做种植田和水壶，播种后打水浇地'},
++    {id:'weapon',ok:()=>fa==='A'?G.tools.sword:G.tools.bow,t:fa==='A'?'炼一把「灵剑」（需要灵草）':'做一把「弩」和弩箭'},
++    {id:'boss',ok:()=>G.cleared.mid||G.builds.some(b=>b.t==='boat'),t:'击败敌营首领「'+FACTION[fa].boss+'」，或在灵河渡口造灵舟，打通九州航线',tgt:()=>zoneTgt(ZONES.enemy,'⚔')},
++    {id:'sail',ok:()=>false,t:'去灵河渡口登上灵舟，打开航线图，前往'+regName(ROUTE()[1]),tgt:()=>zoneTgt(ZONES.river,'⚓')}]}
++const TUT_N=6;
++function questFull(){const steps=questSteps();for(let k=0;k<steps.length;k++)if(!steps[k].ok())return Object.assign({n:k+1,all:steps.length},steps[k]);return{n:steps.length,all:steps.length,t:'完成',id:'end'}}
++
++/* ----- 3D 标记：营地光柱 + 采集物光圈 ----- */
++const beam=(()=>{const g=new THREE.Group();const m=new THREE.MeshBasicMaterial({color:'#ffd65a',transparent:true,opacity:.3,depthWrite:false,blending:THREE.AdditiveBlending,side:THREE.DoubleSide,fog:false});
++  const c=new THREE.Mesh(new THREE.CylinderGeometry(1.1,1.6,70,16,1,true).translate(0,35,0),m);const r=new THREE.Mesh(new THREE.RingGeometry(2.2,2.9,40).rotateX(-Math.PI/2),new THREE.MeshBasicMaterial({color:'#ffd65a',transparent:true,opacity:.6,depthWrite:false,fog:false}));r.position.y=.12;
++  g.add(c,r);g.visible=false;g.userData={c,r};scene.add(g);return g})();
++const PK_MAX=48;
++const pkRing=new THREE.InstancedMesh(new THREE.RingGeometry(.42,.56,28).rotateX(-Math.PI/2),new THREE.MeshBasicMaterial({transparent:true,opacity:.85,depthWrite:false,fog:false}),PK_MAX);
++const pkGem=new THREE.InstancedMesh(new THREE.OctahedronGeometry(.11,0),new THREE.MeshBasicMaterial({fog:false}),PK_MAX);
++for(const im of[pkRing,pkGem]){im.count=0;im.frustumCulled=false;im.renderOrder=2;im.setColorAt(0,new THREE.Color());scene.add(im)}
++const _gm=new THREE.Matrix4(),_gq=new THREE.Quaternion(),_gv=new THREE.Vector3(),_gs=new THREE.Vector3(),_gc=new THREE.Color(),_ge=new THREE.Euler();
++let pkList=[],pkT=0;
++function updPickMarks(dt,t){pkT-=dt;if(pkT<=0){pkT=.3;pkList=[];for(const n of nodes){if(!n.alive||!PICK_KINDS.has(n.kind))continue;const d=(n.x-P.x)**2+(n.z-P.z)**2;if(d<26*26)pkList.push([d,n])}pkList.sort((a,b)=>a[0]-b[0]);pkList=pkList.slice(0,PK_MAX).map(a=>a[1])}
++  const tg=GUIDE.tgt;let k=0;for(const n of pkList){if(!n.alive)continue;const isT=tg&&tg.small&&Math.abs(tg.x-n.x)<.01&&Math.abs(tg.z-n.z)<.01;const s=(isT?1.35:1)*(1+Math.sin(t*3+n.x)*.08);
++    _gm.compose(_gv.set(n.x,n.y+.06,n.z),_gq.identity(),_gs.set(s,1,s));pkRing.setMatrixAt(k,_gm);
++    _gm.compose(_gv.set(n.x,n.y+.75+Math.sin(t*2.4+n.z)*.12,n.z),_gq.setFromEuler(_ge.set(0,t*2+n.x,0)),_gs.setScalar(isT?1.5:1));pkGem.setMatrixAt(k,_gm);
++    _gc.set(PICK_C[n.kind]);pkRing.setColorAt(k,_gc);pkGem.setColorAt(k,_gc);k++}
++  pkRing.count=pkGem.count=k;for(const im of[pkRing,pkGem]){im.instanceMatrix.needsUpdate=true;if(im.instanceColor)im.instanceColor.needsUpdate=true}}
++
++/* ----- 屏幕上的指路箭头、互动提示、完成横幅 ----- */
++function guideDom(){if(GUIDE.wpEl)return;const h=el('hud');
++  GUIDE.wpEl=document.createElement('div');GUIDE.wpEl.id='wp';GUIDE.wpEl.innerHTML='<b class="ar">➤</b><span class="tx"></span>';h.appendChild(GUIDE.wpEl);
++  GUIDE.ipEl=document.createElement('div');GUIDE.ipEl.id='ip';el('fx').appendChild(GUIDE.ipEl);
++  GUIDE.doneEl=document.createElement('div');GUIDE.doneEl.id='qdone';h.appendChild(GUIDE.doneEl)}
++function updGuide(dt,t){guideDom();const tg=GUIDE.tgt,wp=GUIDE.wpEl;
++  // 指路箭头（相对镜头方向）
++  if(tg&&!G.dead&&!G.over){const dx=tg.x-P.x,dz=tg.z-P.z,d=Math.hypot(dx,dz);const near=tg.zone?d<(tg.r||10)*.6:d<2.2;
++    if(near){wp.style.display='none'}else{wp.style.display='';const fx=-Math.sin(CAM.yaw),fz=-Math.cos(CAM.yaw),rx=Math.cos(CAM.yaw),rz=-Math.sin(CAM.yaw);const a=Math.atan2(dx*rx+dz*rz,dx*fx+dz*fz);
++      wp.firstChild.style.transform=`rotate(${a-Math.PI/2}rad)`;wp.lastChild.textContent=`${tg.icon} ${tg.label} · ${Math.round(d)} 米`}
++    beam.visible=!!tg.zone&&d>8;if(beam.visible){beam.position.set(tg.x,groundAt(tg.x,tg.z),tg.z);beam.userData.c.material.opacity=.22+.08*Math.sin(t*2.5);const s=1+.08*Math.sin(t*3);beam.userData.r.scale.set(s,1,s)}}
++  else{wp.style.display='none';beam.visible=false}
++  // 互动提示：贴在要捡/要交互的东西上方
++  const it=GUIDE.it,ip=GUIDE.ipEl;if(it&&it.pos&&!busy()){const p=proj(it.pos.x,(it.pos.y||groundAt(it.pos.x,it.pos.z))+1.25,it.pos.z);if(p){ip.style.display='';ip.style.transform=`translate(${p[0]}px,${p[1]}px) translate(-50%,-100%)`;ip.innerHTML=(touchUI()?'<i>👆 点「互动」</i>':'<i>E</i>')+it.label}else ip.style.display='none'}else ip.style.display='none';
++  updPickMarks(dt,t);
++  // 画质建议：只根据本机实测帧率，连续 20 秒低于 24 帧才提示一次
++  if(!GUIDE.suggested&&Q.tier!=='min'&&G.started&&!G.paused){GUIDE.lowFps=fpsV<24?GUIDE.lowFps+dt:Math.max(0,GUIDE.lowFps-dt*2);if(GUIDE.lowFps>20){GUIDE.suggested=true;toast('画面有点卡？可以在「设置 → 画质」换成'+(Q.tier==='high'?'「流畅」或「极简」':'「极简」'),1)}}}
++function guideMini(c,tp,sc,S,full){const tg=GUIDE.tgt;if(!tg)return;let [x,y]=tp(tg.x,tg.z);const [px,py]=tp(P.x,P.z);const m=10*sc;let out=false;
++  if(!full&&(x<m||y<m||x>S-m||y>S-m)){const dx=x-px,dy=y-py,k=Math.min(Math.abs((S/2-m)/(dx||1e-6)),Math.abs((S/2-m)/(dy||1e-6)));x=px+dx*k;y=py+dy*k;out=true}
++  c.save();c.setLineDash([6*sc,4*sc]);c.lineWidth=3*sc;c.strokeStyle='rgba(255,200,40,.95)';c.beginPath();c.moveTo(px,py);c.lineTo(x,y);c.stroke();c.setLineDash([]);
++  const r=(out?6:8)*sc*(1+.15*Math.sin(performance.now()/200));c.fillStyle='#ffd23a';c.strokeStyle='#5a3a00';c.lineWidth=2*sc;c.beginPath();c.arc(x,y,r,0,7);c.fill();c.stroke();c.restore()}
++
++/* ----- 每 0.25 秒：算当前目标、发奖励、显示完成提示 ----- */
++function guideTick(){const q=CH===2?quest2():questFull();
++  if(CH!==2){const zn=zoneOf(P.x,P.z);if(zn==='home')G.flags.camp=1}
++  const rw=G.flags.qr||(G.flags.qr={});
++  if(!GUIDE.init){GUIDE.init=true;if(CH!==2){const st=questSteps();for(let k=0;k<q.n-1&&k<st.length;k++)rw[st[k].id]=1}G._qn=q.n;G._qid=q.id}   // 读档时已经完成的步骤不补发奖励
++  if(q.n>G._qn&&!G.over){const st=CH!==2?questSteps():null;let got=[];
++    for(let k=G._qn-1;k<q.n-1;k++){const id=st?st[k].id:'q2_'+k;if(rw[id])continue;rw[id]=1;const r=TUT_REW[id];if(r){give(r);got.push(fmtCost(r))}}
++    gainXP(40);const prev=st?st[G._qn-1]:null;showDone(prev?prev.t:'目标完成',['经验 +40'].concat(got).join('　'),q.t);save()}
++  G._qn=q.n;G._qid=q.id;GUIDE.step=q;
++  try{GUIDE.tgt=q.tgt?q.tgt():null}catch(e){GUIDE.tgt=null}
++  if(CH===2&&!GUIDE.tgt){const k=q.n;GUIDE.tgt=k===1?(G.merchant?{x:G.merchant.x,z:G.merchant.z,label:'商人',icon:'🏮',zone:true,r:6}:null):k===2&&CH2OBJ.chest?{x:CH2OBJ.chest.x,z:CH2OBJ.chest.z,label:'秘境宝箱',icon:'🎁',zone:true,r:8}:k===3?zoneTgt(ZONES.enemy,'⚔'):k===4?zoneTgt(ZONES.river,'⚓'):null}
++  const tut=CH!==2&&q.n<=TUT_N,rew=CH!==2&&TUT_REW[q.id]&&!rw[q.id]?fmtCost(TUT_REW[q.id]):'';
++  el('quest').innerHTML=`<b>${tut?'新手引导 '+q.n+'/'+TUT_N:'目标 '+q.n+'/'+q.all}</b>${q.t}`+(q.prog?`<div class="qp">${q.prog()}</div>`:'')+(q.act?`<div class="qa">👉 ${q.act}</div>`:'')+(rew?`<div class="qr">🎁 奖励：${rew}　经验 +40</div>`:'');
++  for(const id of['craftB'])el(id).classList.toggle('hint',q.hl===id&&!el('craft').classList.contains('on'));
++  GUIDE.rec=q.rec||null;GUIDE.tab=q.tab||null}
++let doneT=null;
++function showDone(title,rew,next){const d=GUIDE.doneEl;if(!d)return;d.innerHTML=`<div class="h">✓ 完成：${title}</div><div class="r">获得 ${rew}</div>${next&&next!=='完成'?`<div class="n">下一步：${next}</div>`:''}`;d.classList.remove('on');void d.offsetWidth;d.classList.add('on');el('hud').classList.add('qdon');clearTimeout(doneT);doneT=setTimeout(()=>{d.classList.remove('on');el('hud').classList.remove('qdon')},4200)}
++// 拾取反馈：飘字 + 背包格子闪一下
++function pickFX(n,l){const T={wood:'🪵',stone:'🪨',herb:'🌿',berry:'🍓',seed:'🌱'};let k=0;for(const key in l){ftxt(n.x,n.y+.7+k*.45,n.z,(T[key]||'')+' +'+l[key]+' '+ITEM[key],'pick');GUIDE.flash[key]=performance.now();k++}
++  burst(n.x,n.y+.3,n.z,PICK_MAT[n.kind]||MAT.gold,5,1.2)}
++const PICK_MAT={};for(const k in PICK_C)PICK_MAT[k]=new THREE.MeshBasicMaterial({color:PICK_C[k]});
++function invFlash(k){return performance.now()-(GUIDE.flash[k]||0)<900}
++function qualityLabel(t){return{high:'高清',low:'流畅（省电）',min:'极简（最省电）'}[t]}
