@@ -8,7 +8,7 @@ function audInit(){if(AUD.ctx){if(AUD.ctx.state==='suspended')AUD.ctx.resume().c
   AUD.master=c.createGain();AUD.master.gain.value=.9;AUD.master.connect(c.destination);
   const comp=c.createDynamicsCompressor();comp.threshold.value=-14;comp.ratio.value=4;comp.connect(AUD.master);
   AUD.sfxG=c.createGain();AUD.sfxG.gain.value=AUD.on.sfx?.8:0;AUD.sfxG.connect(comp);
-  AUD.musG=c.createGain();AUD.musG.gain.value=AUD.on.mus?.32:0;AUD.musG.connect(comp);
+  AUD.musG=c.createGain();AUD.musG.gain.value=AUD.on.mus?.55:0;AUD.musG.connect(comp);
   // 混响：用衰减的噪声做脉冲响应
   const len=c.sampleRate*2.6,ir=c.createBuffer(2,len,c.sampleRate);for(let ch=0;ch<2;ch++){const d=ir.getChannelData(ch);for(let i=0;i<len;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/len,3)}
   AUD.rev=c.createConvolver();AUD.rev.buffer=ir;const rg=c.createGain();rg.gain.value=.38;AUD.rev.connect(rg);rg.connect(comp);
@@ -17,7 +17,7 @@ function audInit(){if(AUD.ctx){if(AUD.ctx.state==='suspended')AUD.ctx.resume().c
 ['pointerdown','touchstart','keydown','click'].forEach(e=>window.addEventListener(e,audInit,{capture:true,passive:true}));
 document.addEventListener('visibilitychange',()=>{if(!AUD.ctx)return;if(document.hidden)AUD.ctx.suspend().catch(()=>{});else AUD.ctx.resume().catch(()=>{})});
 function audSet(k,v){AUD.on[k]=v;try{localStorage.setItem('td5_snd',JSON.stringify(AUD.on))}catch(e){}if(!AUD.ctx)return;const t=AUD.ctx.currentTime;
-  if(k==='sfx')AUD.sfxG.gain.setTargetAtTime(v?.8:0,t,.05);if(k==='mus')AUD.musG.gain.setTargetAtTime(v?.32:0,t,.3)}
+  if(k==='sfx')AUD.sfxG.gain.setTargetAtTime(v?.8:0,t,.05);if(k==='mus')AUD.musG.gain.setTargetAtTime(v?.55:0,t,.3)}
 
 /* 基本发声单元 */
 function tone(o){const c=AUD.ctx,t=c.currentTime+(o.at||0);const os=c.createOscillator(),g=c.createGain();os.type=o.type||'sine';os.frequency.setValueAtTime(o.f,t);if(o.f2)os.frequency.exponentialRampToValueAtTime(Math.max(20,o.f2),t+(o.slide||o.d));if(o.det)os.detune.value=o.det;
@@ -60,22 +60,40 @@ const SFX_VOL={swing:8,hit:4.5,flesh:5,chop:6.5,mine:7,pickup:2,craft:1.3,hurt:5
 function sfx(k,arg){if(!AUD.ctx||!AUD.on.sfx||!SFX[k])return;const now=performance.now();if(now-(AUD.last[k]||0)<45)return;AUD.last[k]=now;
   const g=AUD.ctx.createGain();g.gain.value=SFX_VOL[k]||1;g.connect(AUD.sfxG);AUD.cur=g;try{SFX[k](arg)}catch(e){}AUD.cur=null;setTimeout(()=>{try{g.disconnect()}catch(e){}},6000)}
 
-/* 背景音乐：D 宫五声音阶，随机游走的旋律 + 低音铺底 + 战斗时的鼓 */
-function musStart(){if(AUD.mus||!AUD.ctx)return;const c=AUD.ctx;const M=AUD.mus={next:c.currentTime+.5,deg:7,drum:0,pad:null,padT:0};
-  setInterval(musTick,120)}
+/* 背景音乐：D 宫五声音阶的古风曲子。四小节和声循环（宫-徵-羽-商）、两小节一句的旋律动机（重复后再变奏）、
+   古筝拨弦 + 笛子长音 + 低音 + 堂鼓/木鱼/沙锤。白天 112 拍、夜里 90 拍更安静、附近有敌人时 138 拍加重鼓点。 */
+const MKEY=62,MPROG=[0,-5,-3,-7];
+const pen=d=>{const o=Math.floor(d/5),r=((d%5)+5)%5;return o*12+PENTA[r]};
+function newMotif(dense){const m=[];let d=5+Math.floor(Math.random()*3);
+  for(let i=0;i<16;i++){const on=i%4===0?.92:i%2===0?.7:dense;if(Math.random()<on){d=clamp(d+[-2,-1,-1,0,1,1,2,3][Math.floor(Math.random()*8)],2,12);m.push({d,long:i%4===0&&Math.random()<.3})}else m.push(null)}
+  m[0]=m[0]||{d:5};return m}
+function flute(m,at,d,v,out){const c=AUD.ctx,t=c.currentTime+at,f=hz(m);const o=c.createOscillator(),g=c.createGain(),lfo=c.createOscillator(),lg=c.createGain();
+  o.type='sine';o.frequency.value=f;lfo.frequency.value=5.5;lg.gain.value=f*.006;lfo.connect(lg);lg.connect(o.frequency);
+  g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(v,t+.06);g.gain.setValueAtTime(v,t+d*.7);g.gain.exponentialRampToValueAtTime(.0001,t+d);
+  o.connect(g);g.connect(out);const r=c.createGain();r.gain.value=.5;g.connect(r);r.connect(AUD.rev);o.start(t);lfo.start(t);o.stop(t+d+.05);lfo.stop(t+d+.05);
+  tone({f:f*2,type:'sine',d:d*.8,v:v*.12,at,a:.06,out});noise({f:f*2,q:3,d:.12,v:v*.25,at,out})}
+function musStart(){if(AUD.mus||!AUD.ctx)return;AUD.mus={next:AUD.ctx.currentTime+.3,step:0,bar:0,motif:newMotif(.4),rep:0};setInterval(musTick,90)}
 function musMood(){let night=false,fight=false;try{if(typeof G!=='undefined'){const h=G.hour||12;night=h<5.5||h>19;if(G.started&&!G.dead&&typeof ACT!=='undefined'&&typeof P!=='undefined')for(const a of ACT){if(!a.dead&&a.angry&&(a.human||a.boss||a.kind==='wolf'||a.ghost||a.xinmo)&&Math.hypot(a.x-P.x,a.z-P.z)<26){fight=true;break}}}}catch(e){}return{night,fight}}
-function musTick(){const c=AUD.ctx,M=AUD.mus;if(!c||c.state!=='running'||!AUD.on.mus)return;const mood=musMood(),base=mood.night?50:62,out=AUD.musG;
-  // 低音铺底：每 8 秒换一次（宫音或徵音）
-  if(c.currentTime>M.padT-.2){const root=base-12+(Math.random()<.35?7:0),t=M.padT=Math.max(c.currentTime,M.padT)+8;
-    for(const [m,dt] of [[root,0],[root+7,8]]){const os=c.createOscillator(),g=c.createGain(),f=c.createBiquadFilter();os.type='sawtooth';os.frequency.value=hz(m);os.detune.value=dt;f.type='lowpass';f.frequency.value=mood.night?380:520;
-      const s=t-8;g.gain.setValueAtTime(.0001,s);g.gain.exponentialRampToValueAtTime(.05,s+2.5);g.gain.setValueAtTime(.05,t-2);g.gain.exponentialRampToValueAtTime(.0001,t+.5);os.connect(f);f.connect(g);g.connect(out);const r=c.createGain();r.gain.value=.6;g.connect(r);r.connect(AUD.rev);os.start(s);os.stop(t+.6)}}
-  // 旋律：拨弦，夜里更稀疏
-  if(M.next<c.currentTime-.5)M.next=c.currentTime+.05;
-  while(M.next<c.currentTime+.3){const step=mood.fight?.25:mood.night?.75:.5;
-    if(Math.random()<(mood.fight?.55:mood.night?.4:.55)){M.deg=clamp(M.deg+[-2,-1,-1,1,1,2,0][Math.floor(Math.random()*7)],0,11);const oct=Math.floor(M.deg/5),m=base+oct*12+PENTA[M.deg%5];
-      pluck(m,M.next-c.currentTime,mood.night?.1:.13,out,mood.night?2.2:1.5);if(Math.random()<.12)pluck(m+12,M.next-c.currentTime+.06,.06,out,1.2)}
-    if(mood.fight){const beat=M.drum++%8;if(beat===0||beat===3||beat===4||beat===6){const at=M.next-c.currentTime;tone({f:110,f2:45,d:.35,v:beat===0?.5:.3,at,out});noise({ft:'lowpass',f:400,d:.12,v:.2,at,out})}}else M.drum=0;
-    M.next+=step*(Math.random()<.15?2:1)}}
+function musTick(){const c=AUD.ctx,M=AUD.mus;if(!c||c.state!=='running'||!AUD.on.mus)return;const mood=musMood(),out=AUD.musG;
+  const bpm=mood.fight?138:mood.night?90:112,st=60/bpm/2;
+  if(M.next<c.currentTime-.4)M.next=c.currentTime+.05;
+  while(M.next<c.currentTime+.6){const at=Math.max(0,M.next-c.currentTime),s=M.step%8,root=MPROG[M.bar%4],key=MKEY+(mood.night?-5:0);
+    // 和声铺底：每小节换一次
+    if(s===0){const bd=st*8;for(const [iv,dt] of [[0,0],[7,6]]){const o=c.createOscillator(),g=c.createGain(),f=c.createBiquadFilter();o.type='sawtooth';o.frequency.value=hz(key-12+root+iv);o.detune.value=dt;f.type='lowpass';f.frequency.value=mood.night?420:650;
+        const t=c.currentTime+at;g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(mood.night?.035:.026,t+.25);g.gain.setValueAtTime(mood.night?.035:.026,t+bd-.2);g.gain.exponentialRampToValueAtTime(.0001,t+bd+.1);o.connect(f);f.connect(g);g.connect(out);o.start(t);o.stop(t+bd+.15)}}
+    // 低音：1、2 拍后半、4 拍
+    if(s===0||s===3||(s===6&&!mood.night)){const n=key-24+root+(s===3?7:s===6?12:0);tone({f:hz(n),type:'triangle',d:st*2.6,v:.26,at,lp:650,out});tone({f:hz(n),type:'sawtooth',d:.1,v:.05,at,lp:900,out})}
+    // 鼓
+    const kick=mood.fight?[0,3,4,6]:mood.night?[0]:[0,4];
+    if(kick.includes(s)){tone({f:110,f2:42,d:.32,v:mood.fight?.55:.4,at,out});noise({ft:'lowpass',f:350,d:.1,v:.18,at,out})}
+    if(!mood.night&&(s===2||s===6)){tone({f:740,type:'triangle',d:.07,v:.14,at,out});tone({f:1180,type:'sine',d:.04,v:.06,at,out})}
+    if(mood.fight&&(s===2||s===6))noise({f:1800,q:.7,d:.14,v:.3,at,out});
+    if(!mood.night)noise({ft:'highpass',f:7000,d:.035,v:s%2?.05:.08,at,out});
+    // 旋律：两小节一句，重复一次再换
+    const ms=M.motif[M.step%16];if(ms&&(!mood.night||Math.random()<.75)){const m=key+pen(ms.d);
+      if(ms.long&&!mood.fight)flute(m,at,st*3.2,mood.night?.07:.09,out);else{pluck(m,at,mood.night?.12:.15,out,mood.night?1.8:1.1);if(Math.random()<.18)pluck(m+12,at+st*.5,.06,out,.8)}}
+    M.next+=st;M.step++;if(M.step%8===0)M.bar++;
+    if(M.step%16===0){M.rep++;if(M.rep>=2){M.rep=0;M.motif=newMotif(mood.fight?.55:mood.night?.2:.4)}else{const v=M.motif.map(x=>x&&Math.random()<.25?{d:clamp(x.d+(Math.random()<.5?1:-1),2,12),long:x.long}:x);M.motif=v}}}}
 
 /* 设置里的开关 + 按钮点击音 */
 (function(){const sb=document.getElementById('sndBtn'),mb=document.getElementById('musBtn');
