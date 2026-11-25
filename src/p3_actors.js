@@ -131,7 +131,8 @@ function animBeast(b,sp,dt,st){const r=b.beast;b.phase+=dt*(sp>.1?sp*2.2:1.2);co
 
 /* ---------- Grok 生成的模型：敌兵、首领、狼、野猪 ---------- */
 const GROKM={};
-async function grokPreload(){if(typeof GROKB==='undefined')return;for(const k in GROKB){if(GROKM[k])continue;try{const r=atob(GROKB[k]),u=new Uint8Array(r.length);for(let i=0;i<r.length;i++)u[i]=r.charCodeAt(i);GROKM[k]=await parseGLB(u.buffer)}catch(e){console.warn('grok',k,e)}}}
+const GROK_KEYS=['viking','boy','xianxia','wolf','boar','youhun'];
+async function grokPreload(){await Promise.all(GROK_KEYS.map(async k=>{if(GROKM[k])return;try{const r=await fetch('assets/models/'+k+'.glb');if(!r.ok)throw new Error(r.status);GROKM[k]=await parseGLB(await r.arrayBuffer())}catch(e){console.warn('grok',k,e)}}))}
 function grokHuman(k,scale=1){const gl=GROKM[k];if(!gl)return null;const w=glbWrap(gl,false,true);w.scale.setScalar(scale);w.grok=k;return w}
 const GB_MAT={};
 function grokBeast(kind){const gl=GROKM[kind];if(!gl)return null;const B_=BEASTS[kind],src=gl.scene.clone(true);

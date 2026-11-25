@@ -1,18 +1,14 @@
-import base64
-FILES=['p1_core.js','nat_assets.js','mkt_assets.js','fangshi_assets.js','tex_assets.js','grok_assets.js','gtree_assets.js','p2_world.js','p3_actors.js','p4_game.js','p6_cult.js','p7_guide.js','p5_ui.js']
-s=open('shell.html').read().replace("if(m&&!window.GAME_OK)m.textContent","if(m&&document.getElementById('loading').style.display!=='none')m.textContent")
-code="\n".join(open(f).read() for f in FILES)
-hero=base64.b64encode(open('/home/claude/hero/xiushi.glb','rb').read()).decode()
-open('听道-灵河求生.html','w').write(s.replace('/*__CODE__*/',code).replace('/*__HERO__*/',hero).replace('/*__HEROB__*/',base64.b64encode(open('/home/claude/td5/earth.glb','rb').read()).decode()))
-parts=[open(f).read() for f in FILES]
-parts[0]="\n".join(l for l in parts[0].split("\n") if not l.startswith("import "))
-open('/tmp/chk.mjs','w').write("\n".join(p.strip() for p in parts))
-# ---- artifact version: big asset files served as separate scripts ----
-ASSETS=['nat_assets.js','mkt_assets.js','fangshi_assets.js','tex_assets.js','grok_assets.js','gtree_assets.js']
+# 生成仓库根目录的 index.html（网页版 / itch.io 版）
+# 用法：在 src 目录里运行  python3 build.py
+# 大素材在 ../assets/*.js（按顺序用 <script src> 加载），3D 模型在 ../assets/models/*.glb（游戏里按需 fetch），
+# three.js 在 ../vendor/three/（不依赖外网 CDN）。
 import os
-os.makedirs('art/assets',exist_ok=True)
-for a in ASSETS:open('art/assets/'+a,'w').write(open(a).read())
-code2="\n".join(open(f).read() for f in FILES if f not in ASSETS)
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
+FILES=['p1_core.js','p2_world.js','p3_actors.js','p4_game.js','p6_cult.js','p7_guide.js','p5_ui.js']
+ASSETS=['nat_assets.js','mkt_assets.js','fangshi_assets.js','tex_assets.js','gtree_assets.js']
+s=open('shell.html',encoding='utf8').read().replace("if(m&&!window.GAME_OK)m.textContent","if(m&&document.getElementById('loading').style.display!=='none')m.textContent")
+code="\n".join(open(f,encoding='utf8').read() for f in FILES)
 tags="".join('<script src="assets/%s"></script>\n'%a for a in ASSETS)
-s2=s.replace('<script type="module">',tags+'<script type="module">',1)
-open('art/index.html','w').write(s2.replace('/*__CODE__*/',code2).replace('/*__HERO__*/',hero).replace('/*__HEROB__*/',base64.b64encode(open('/home/claude/td5/earth.glb','rb').read()).decode()))
+s=s.replace('<script type="module">',tags+'<script type="module">',1)
+open('../index.html','w',encoding='utf8').write(s.replace('/*__CODE__*/',code))
+print('wrote ../index.html')

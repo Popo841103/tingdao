@@ -120,7 +120,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#9fd3ea;font-family:"P
 @media (min-width:900px) and (pointer:fine){#joyHint{display:none}}
 </style></head><body>
 <div id="rot"><b>📱</b>请把手机横过来玩<br><span style="font-size:14px;opacity:.75">（如果转不过来：打开手机的「自动旋转」，关掉「竖屏锁定」）</span></div><canvas id="c"></canvas>
-<div id="loading"><b>听道</b><div>正在加载 3D 引擎…（第一次打开需要联网）</div><div id="lmsg" style="font-size:13px;color:#8a7a60"></div></div>
+<div id="loading"><b>听道</b><div>正在加载 3D 引擎…</div><div id="lmsg" style="font-size:13px;color:#8a7a60"></div></div>
 <div id="start" style="display:none"><div class="box pan">
   <h1>听道</h1><div class="sub">灵河求生 · 中州篇<br>九州之地，中州最强。上四州属原生修士，下四州为穿越者所据。<br>你流落到中州的「灵河界」——活下去，然后造舟回乡，或者击败敌首。</div>
   <div class="facs"><div class="fac" data-f="A"><b>☯ 修士</b><small>来自上四州的原生修仙者。会画火符（技能键），能炼灵剑；后期火符可升级成雷符。</small></div>
@@ -162,17 +162,27 @@ html,body{margin:0;height:100%;overflow:hidden;background:#9fd3ea;font-family:"P
 <div class="modal" id="stat"><div class="pan"><h2>人物 · 加点<button class="x" data-close="stat">✕</button></h2><div class="lore" id="slv"></div><div class="list" id="slist"></div><div class="lore" id="sder"></div></div></div>
 <div class="modal" id="set"><div class="pan"><h2>设置<button class="x" data-close="set">✕</button></h2>
   <div class="srow"><button id="qBtn">画质</button><button id="saveBtn">立即存档</button><button id="quitBtn">保存并回到主菜单</button></div>
+  <div class="lore"><b>存档备份</b>：存档只保存在这个浏览器里，换手机或清理缓存会丢失。可以导出成文件保存，之后再导入。</div>
+  <div class="srow"><button id="expBtn">导出存档</button><button id="impBtn">导入存档</button><input type="file" id="impIn" accept=".json,application/json" style="display:none"></div>
   <div class="lore"><b>替换主角模型（Tripo 导出的 .glb）</b><br>选择文件后马上替换，并记住，下次打开自动使用。</div>
   <div class="srow"><button id="glbBtn">选择 .glb 文件</button><button id="glbBuiltin">用内置修士 3D 模型</button><button id="glbReset">用简单人物</button><label style="font-size:13px;display:flex;align-items:center;gap:4px"><input type="checkbox" id="flip">人物背对前进方向时勾这里</label></div>
   <input type="file" id="glbIn" accept=".glb,.gltf,model/gltf-binary" style="display:none"><div id="glbMsg"></div></div></div>
 <div class="full" id="death"><h1>你倒下了</h1><p>读取上一次的存档（睡觉时、每隔一会儿会自动存档）。</p><button class="big" id="reload">读取存档</button></div>
 <div class="full" id="end"><h1 id="endT"></h1><p id="endX"></p><div class="btns"><button class="big alt" id="next" style="display:none">扬帆回乡 · 第二章</button><button class="big" id="again">再来一局</button></div></div>
-<script>window.__t=setTimeout(function(){if(!window.GAME_OK){var m=document.getElementById('lmsg');m.innerHTML='3D 引擎加载失败或太慢。<br>请检查网络后刷新页面；如果在微信里打开，请点右上角「在浏览器打开」。'}},15000);
+<script>window.__t=setTimeout(function(){if(!window.GAME_OK){var m=document.getElementById('lmsg');m.innerHTML='3D 引擎加载失败或太慢。<br>请刷新页面重试；如果在微信里打开，请点右上角「在浏览器打开」。'}},15000);
 window.addEventListener('error',function(e){var m=document.getElementById('lmsg');if(m&&!window.GAME_OK)m.textContent='出错：'+e.message});</script>
-<script type="text/plain" id="heroA">/*__HERO__*/</script>
-<script type="text/plain" id="heroB">/*__HEROB__*/</script>
-<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+<script type="importmap">{"imports":{"three":"./vendor/three/three.module.min.js","three/addons/":"./vendor/three/addons/"}}</script>
 <script type="module">
 /*__CODE__*/
 </script>
+<script>(function(){
+function keys(){var o={};for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);if(k&&k.indexOf('td5_')===0)o[k]=localStorage.getItem(k)}return o}
+document.getElementById('expBtn').onclick=function(){try{var s=document.getElementById('saveBtn');if(s)s.click()}catch(e){}
+  try{var d=keys();if(!d.td5_save&&!Object.keys(d).length){alert('还没有存档');return}
+  var b=new Blob([JSON.stringify({game:'tingdao',v:1,t:Date.now(),data:d})],{type:'application/json'}),a=document.createElement('a');
+  a.href=URL.createObjectURL(b);a.download='听道存档-'+new Date().toISOString().slice(0,10)+'.json';document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(a.href);a.remove()},1000)}catch(e){alert('导出失败：'+e.message)}};
+document.getElementById('impBtn').onclick=function(){document.getElementById('impIn').click()};
+document.getElementById('impIn').onchange=function(ev){var f=ev.target.files[0];if(!f)return;var r=new FileReader();r.onload=function(){try{var j=JSON.parse(r.result);if(!j||j.game!=='tingdao'||!j.data)throw new Error('不是听道的存档文件');
+  if(!confirm('导入会覆盖当前存档，确定吗？'))return;for(var k in j.data)if(k.indexOf('td5_')===0)localStorage.setItem(k,j.data[k]);alert('导入成功，即将重新加载');location.reload()}catch(e){alert('导入失败：'+e.message)}};r.readAsText(f);ev.target.value=''};
+})();</script>
 </body></html>

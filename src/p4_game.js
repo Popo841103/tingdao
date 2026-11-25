@@ -369,7 +369,7 @@ async function startGame(fac,origin,sv){G.starting=true;try{await grokPreload()}
   populate();initRegion(sv);
   P.model=makeHuman(fac);scene.add(P.model);P.glider=mkGlider();P.model.add(P.glider);
   const glb=await idbGet('hero_glb');if(glb&&glb.buf){try{await useGLB(glb.buf,glb.flip,true)}catch(e){toast('自定义模型加载失败，已用默认人物')}}
-  else if(!glb&&builtinHero(fac==='A'?'heroA':'heroB')){try{await useGLB(builtinHero(fac==='A'?'heroA':'heroB'),false,true)}catch(e){console.warn(e)}}
+  else if(!glb){const hb=await builtinHero(fac==='A'?'heroA':'heroB');if(hb)try{await useGLB(hb,false,true)}catch(e){console.warn(e)}}
   equip(sv&&sv.weapon&&(sv.weapon==='fist'||G.tools[sv.weapon])?sv.weapon:'fist');
   try{if(CH!==2)placeCampPickups()}catch(e){console.warn('placeCampPickups',e)}
   P.y=groundAt(P.x,P.z);refreshGrass(P.x,P.z);G.started=true;G.raidDay=G.hour>=20?G.day:0;if(!sv)save();
@@ -380,6 +380,7 @@ async function useGLB(buf,flip,quiet){const w=await buildGLBHero(buf.slice(0),fl
   if(G.started||quiet)attachGLBProp(WEAPONS[G.weapon].prop);const g=w.glb;const miss=['idle','walk','run','jump','swim','glide','attack'].filter(k=>!g.acts[k]);
   if(!quiet)toast('模型已替换。找到的动作：'+(g.names.join('、')||'（没有动作）')+(miss.length?'；缺少：'+miss.join('、')+'（会用其它动作代替）':''),1);return g}
 async function importGLB(file,flip){const buf=await file.arrayBuffer();const g=await useGLB(buf,flip);await idbSet('hero_glb',{buf,flip});return g}
-function builtinHero(id){const e=document.getElementById(id||(G.faction==='B'?'heroB':'heroA'));if(!e||e.textContent.length<100)return null;const s=atob(e.textContent.trim()),u=new Uint8Array(s.length);for(let i=0;i<s.length;i++)u[i]=s.charCodeAt(i);return u.buffer}
-async function useBuiltin(){await idbSet('hero_glb',null);const b=builtinHero();if(b){await useGLB(b,false,true);toast('已换回内置 3D 人物模型')}else toast('没有内置 3D 模型')}
+const HERO_CACHE={};
+async function builtinHero(id){id=id||(G.faction==='B'?'heroB':'heroA');try{if(!HERO_CACHE[id]){const r=await fetch('assets/models/'+id+'.glb');if(!r.ok)return null;HERO_CACHE[id]=await r.arrayBuffer()}return HERO_CACHE[id].slice(0)}catch(e){console.warn('hero',e);return null}}
+async function useBuiltin(){await idbSet('hero_glb',null);const b=await builtinHero();if(b){await useGLB(b,false,true);toast('已换回内置 3D 人物模型')}else toast('没有内置 3D 模型')}
 async function resetModel(){await idbSet('hero_glb',{simple:1});const m=makeHuman(G.faction);scene.remove(P.model);P.model=m;scene.add(m);P.glider=mkGlider();m.add(P.glider);P.model.rig.propKey=null;equip(G.weapon);toast('已恢复默认人物')}
