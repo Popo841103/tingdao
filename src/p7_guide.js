@@ -42,13 +42,24 @@ function questSteps(){const f=G.flags,i=G.inv,fa=G.faction,T=touchUI(),press=T?'
       tgt:()=>(i.stone||0)<3?ptTgt(nearestNode(['pebble']),'石子','🪨'):(i.wood||0)<4?treeTgt():null},
     {id:'cook',ok:()=>f.cook||f.harvest,t:'在篝火边烤肉',act:(i.meat||0)>0?'带着生肉走到篝火旁，'+press+'「烤肉」。':'先打猎（兔、鹿、野猪）得到生肉，再到篝火旁烤。',
       tgt:()=>(i.meat||0)>0?ptTgt(nearestFire(),'篝火','🔥'):ptTgt(nearestOf(ACT,a=>!a.dead&&a.def&&a.def.flee&&!a.human),'猎物','🦌')},
-    {id:'shelter',ok:()=>f.b_shelter,t:'搭一个「庇护所」（木12），天黑后去睡觉'},
+    {id:'shelter',ok:()=>f.b_shelter,t:'搭一个「庇护所」（木12），天黑后去睡觉',prog:()=>`木头 ${Math.min(i.wood||0,12)}/12`,act:'木头够了就点「制造」→「建造」→「庇护所」。天黑后走到庇护所旁'+press+'睡觉，会自动存档。',hl:'craftB',rec:'shelter',tab:'build',tgt:()=>(i.wood||0)<12?treeTgt():null},
     {id:'merchant',ok:()=>f.merchant,t:'去「坊市」找商人（地图上的🏮）',act:'跟着金色箭头走，到商人旁边点「和商人交易」。',tgt:()=>G.merchant?{x:G.merchant.x,z:G.merchant.z,label:'坊市商人',icon:'🏮',zone:true,r:6}:zoneTgt(ZONES.market,'🏮')},
-    {id:'water',ok:()=>f.water,t:'做种植田和水壶，播种后打水浇地'},
+    waterStep(f,i,press),
     {id:'weapon',ok:()=>fa==='A'?G.tools.sword:G.tools.bow,t:fa==='A'?'炼一把「灵剑」（需要灵草）':'做一把「弩」和弩箭'},
     {id:'boss',ok:()=>G.cleared.mid||G.builds.some(b=>b.t==='boat'),t:'击败敌营首领「'+FACTION[fa].boss+'」，或在灵河渡口造灵舟，打通九州航线',tgt:()=>zoneTgt(ZONES.enemy,'⚔')},
     {id:'sail',ok:()=>false,t:'去灵河渡口登上灵舟，打开航线图，前往'+regName(ROUTE()[1]),tgt:()=>zoneTgt(ZONES.river,'⚓')}]}
 const TUT_N=6;
+/* 种地这一步拆成小步骤：建田 → 做水壶 → 找种子 → 播种 → 打水 → 浇水（下雨浇透也算完成） */
+function waterStep(f,i,press){const farm=nearestOf(G.builds,b=>b.t==='farm'),farms=G.builds.filter(b=>b.t==='farm');
+  const done=()=>f.water||f.harvest||farms.some(b=>b.stage>=2);const s={id:'water',ok:done,t:'种地：建种植田、播种、打水浇地'};
+  const fTgt=()=>ptTgt(farm,'种植田','🌱',2.4);
+  if(!farm)return Object.assign(s,{prog:()=>`木头 ${Math.min(i.wood||0,4)}/4`,act:'点「制造」→「建造」→「种植田」（木4），会建在你面前。',hl:'craftB',rec:'farm',tab:'build',tgt:()=>(i.wood||0)<4?treeTgt():null});
+  if(!G.tools.canteen)return Object.assign(s,{prog:()=>`木头 ${Math.min(i.wood||0,2)}/2`,act:'再做一个「水壶」：点「制造」→「水壶」（木2）。',hl:'craftB',rec:'canteen',tab:'tool',tgt:()=>(i.wood||0)<2?treeTgt():null});
+  if(farms.every(b=>b.stage===0)){if((i.seed||0)<1)return Object.assign(s,{prog:()=>'种子 0/1',act:'需要种子：摘浆果有机会得到（地图上的浆果丛），或去坊市用 1 灵石跟商人换 2 颗。',
+      tgt:()=>ptTgt(nearestNode(['berry']),'浆果丛','🍓')||(G.merchant?{x:G.merchant.x,z:G.merchant.z,label:'坊市商人',icon:'🏮',zone:true,r:6}:null)});
+    return Object.assign(s,{prog:()=>'种子 '+(i.seed||0),act:'走到种植田旁，'+press+'「播种」。',tgt:fTgt})}
+  if((G.water||0)<1)return Object.assign(s,{prog:()=>'水壶 0/3',act:'到河边或海边，站在水边'+press+'「打水」。（下雨也会自动把地浇透）',tgt:()=>({x:riverX(P.z),z:P.z,label:'河边打水',icon:'💧',small:true,nr:4})});
+  return Object.assign(s,{prog:()=>'水壶 '+G.water+'/3',act:'回到种植田旁，'+press+'「浇水」。',tgt:fTgt})}
 function questFull(){const steps=questSteps();for(let k=0;k<steps.length;k++)if(!steps[k].ok())return Object.assign({n:k+1,all:steps.length},steps[k]);return{n:steps.length,all:steps.length,t:'完成',id:'end'}}
 
 /* ----- 3D 标记：营地光柱 + 采集物光圈 ----- */

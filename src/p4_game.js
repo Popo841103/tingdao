@@ -100,7 +100,7 @@ function placeBuild(t,x,z,ry,st){let obj;if(t==='fire')obj=mkFire();if(t==='shel
   const y=t==='boat'?WATER_Y+.25:groundAt(x,z);obj.position.set(x,y,z);obj.rotation.y=ry;scene.add(obj);
   const b=Object.assign({t,x,z,ry,obj,stage:0,g:0},st||{});if(t!=='boat'&&t!=='farm')b.col=addCol({x,z,r:t==='shelter'?1.6:.7});G.builds.push(b);if(t==='farm')updFarm(b,0);return b}
 function updFarm(b,dt){const c=b.obj.userData.crops;if(b.stage===2){b.g+=dt;if(b.g>=150){b.stage=3;if(dist2(b)<900)toast('种植田里的灵谷成熟了')}}
-  if(b.stage===1&&G.rainK>.6){b.stage=2;b.g=0}
+  if(b.stage===1&&G.rainK>.6){b.stage=2;b.g=0;if(!G.flags.water){G.flags.water=1;toast('雨水把种植田浇透了，灵谷开始生长')}}
   const k=b.stage===0?0:b.stage===1?.15:b.stage===2?.15+.85*b.g/150:1;c.visible=b.stage>0;c.children.forEach(cr=>{cr.scale.setScalar(Math.max(.01,k));cr.children[1].visible=b.stage===3})}
 const dist2=(o)=>(o.x-P.x)**2+(o.z-P.z)**2;
 function tryBuild(id){const r=RECIPES.find(r=>r.id===id);const fx=Math.sin(P.yaw),fz=Math.cos(P.yaw);let x=P.x+fx*2.6,z=P.z+fz*2.6;
