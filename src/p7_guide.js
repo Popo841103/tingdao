@@ -97,7 +97,7 @@ function guideTick(){const q=CH===2?quest2():questFull();
   if(!GUIDE.init){GUIDE.init=true;if(CH!==2){const st=questSteps();for(let k=0;k<q.n-1&&k<st.length;k++)rw[st[k].id]=1}G._qn=q.n;G._qid=q.id}   // 读档时已经完成的步骤不补发奖励
   if(q.n>G._qn&&!G.over){const st=CH!==2?questSteps():null;let got=[];
     for(let k=G._qn-1;k<q.n-1;k++){const id=st?st[k].id:'q2_'+k;if(rw[id])continue;rw[id]=1;const r=TUT_REW[id];if(r){give(r);got.push(fmtCost(r))}}
-    gainXP(40);const prev=st?st[G._qn-1]:null;showDone(prev?prev.t:'目标完成',['经验 +40'].concat(got).join('　'),q.t);save()}
+    sfx('quest');gainXP(40);const prev=st?st[G._qn-1]:null;showDone(prev?prev.t:'目标完成',['经验 +40'].concat(got).join('　'),q.t);save()}
   G._qn=q.n;G._qid=q.id;GUIDE.step=q;
   try{GUIDE.tgt=q.tgt?q.tgt():null}catch(e){GUIDE.tgt=null}
   // 新手阶段走进水里：箭头先指回营地，并提醒一次（游泳耗体力，体力没了会掉血）

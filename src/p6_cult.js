@@ -50,19 +50,19 @@ const SKILLS={
 const PASSIVES=[[1,'御风：空中可再跳一次，没有滑翔伞也能滑翔'],[1,'神识 / 扫描：20 秒内地图显示附近宝箱、灵脉、野兽'],[2,'灵植催生：种植田生长 ×3，灵兽干活 ×1.5'],[2,'御剑飞行：自由飞行，按住「跳」上升'],[3,'元婴护体：受到伤害 -10%'],[4,'化神：灵气自动缓慢增长']];
 function cycleSkill(){const ks=Object.keys(SKILLS).filter(k=>G.realm>=SKILLS[k].realm);const i=ks.indexOf(G.skillSel);G.skillSel=ks[(i+1)%ks.length];toast('技能键：'+SKILLS[G.skillSel].n()+(ks.length<2?'（筑基后会解锁更多修仙技能）':''))}
 function castSkill(k){const S=SKILLS[k];if(k==='fly'&&G.flying){G.flying=false;toast('收起飞行');return}
-  if(S.cost&&G.mana<S.cost){toast((G.faction==='A'?'灵力':'能量')+'不足（需要 '+S.cost+'）');return}if(S.cost)G.mana-=S.cost;P.atkCd=.4;
+  if(S.cost&&G.mana<S.cost){toast((G.faction==='A'?'灵力':'能量')+'不足（需要 '+S.cost+'）');return}if(S.cost)G.mana-=S.cost;P.atkCd=.4;if(k!=='tian')sfx('skill');
   if(k==='shen'){G.revealT=20;const n=PCHESTS.filter(c=>!c.open&&Math.hypot(c.x-P.x,c.z-P.z)<200).length;burst(P.x,P.y+1.6,P.z,MAT.crystal,12,3);toast('神识展开：附近还有 '+n+' 个未开的宝箱（看地图）')}
   if(k==='fly'){G.flying=true;P.vy=3;P.ground=false;toast((G.faction==='A'?'御剑飞行':'喷射飞行')+'：按住「跳」上升，松开慢慢下降，再按技能键落地')}
   if(k==='tian'){let n=0;for(const a of ACT){if(a.dead||Math.hypot(a.x-P.x,a.z-P.z)>15)continue;lightning(a.x,a.z);hurtActor(a,60*G.skillMul,P.x,P.z,3,.8);n++}play(P.model,'throw',.5);if(!n)lightning(P.x+Math.sin(P.yaw)*6,P.z+Math.cos(P.yaw)*6);shake(.3)}
   if(k==='clone'){spawnAlly();toast('分身出现，协助你战斗 30 秒')}
   if(k==='slow'){G.slowT=8;burst(P.x,P.y+1,P.z,MAT.crystal,20,6);toast('领域展开：周围敌人变慢 8 秒')}
   if(k==='blink'){const fx=Math.sin(P.yaw),fz=Math.cos(P.yaw);let x=P.x,z=P.z;for(let i=0;i<24;i++){const [nx,nz]=collide(x+fx*.5,z+fz*.5,.35);x=nx;z=nz}burst(P.x,P.y+1,P.z,hitMat,8,2);P.x=x;P.z=z;P.y=Math.max(P.y,groundAt(x,z));burst(x,P.y+1,z,hitMat,8,2)}}
-function lightning(x,z){const y=groundAt(x,z);const m=new THREE.Mesh(new THREE.BoxGeometry(.25,60,.25).translate(0,30,0),new THREE.MeshBasicMaterial({color:'#cfe8ff',transparent:true,opacity:.95,blending:THREE.AdditiveBlending,depthWrite:false}));m.position.set(x,y,z);scene.add(m);
+function lightning(x,z){sfx('thunder');const y=groundAt(x,z);const m=new THREE.Mesh(new THREE.BoxGeometry(.25,60,.25).translate(0,30,0),new THREE.MeshBasicMaterial({color:'#cfe8ff',transparent:true,opacity:.95,blending:THREE.AdditiveBlending,depthWrite:false}));m.position.set(x,y,z);scene.add(m);
   burst(x,y+.4,z,hitMat,10,4);let t=0;FX_RINGS.push({upd:dt=>{t+=dt;m.material.opacity=.95*(1-t/.3);m.scale.x=m.scale.z=1+Math.sin(t*60)*.5;if(t>=.3){scene.remove(m);return true}}})}
 
 /* ---------- 修炼：打坐吸收灵气（灵脉旁 ×5） ---------- */
 function nearLingmai(){return LINGMAI.find(l=>Math.hypot(l.x-P.x,l.z-P.z)<4.5)}
-function startMeditate(){if(G.dead||G.over||busy())return;if(G.med){G.med=false;G.timeScale=1;return}if(G.flying||!P.ground){toast('落地后才能打坐');return}
+function startMeditate(){if(G.dead||G.over||busy())return;if(G.med){G.med=false;G.timeScale=1;return}if(G.flying||!P.ground){toast('落地后才能打坐');return}sfx('bowl');
   if(ACT.some(a=>!a.dead&&(a.angry||a.human)&&!a.def?.flee&&Math.hypot(a.x-P.x,a.z-P.z)<14)){toast('附近有敌人，静不下心');return}
   P.sitFire=null;G.med=true;G.timeScale=3;toast(nearLingmai()?'在灵脉旁打坐：灵气吸收 ×5':(G.faction==='A'?'打坐修炼：慢慢吸收天地灵气（去发光的灵脉旁会快 5 倍）':'充能冥想：吸收环境能量（去发光的灵脉旁会快 5 倍）'))}
 const aura=new THREE.Mesh(new THREE.TorusGeometry(1,.05,6,32),new THREE.MeshBasicMaterial({color:'#9af0ff',transparent:true,opacity:.7,blending:THREE.AdditiveBlending,depthWrite:false}));aura.rotation.x=Math.PI/2;aura.visible=false;scene.add(aura);
@@ -82,7 +82,7 @@ function updTrib(dt){const T=G.trib;if(!T)return;
 function spawnHeart(){const o=makeHuman('xinmo');setProp(o,G.faction==='A'?'sword':'shovel');const p=randAround(P.x,P.z,5,8)||[P.x+5,P.z];const r=G.trib.r;
   const a=addActor({kind:'xinmo',human:true,xinmo:true,name:'心魔',obj:o,x:p[0],z:p[1],hp:Math.round((320+260*r)*DIFF),dmg:(12+7*r)*DIFF,speed:5.2,r:.45,h:2,home:{x:P.x,z:P.z},aggro:80,angry:true,raid:1,stalk:0});
   toast('心魔现身：「你真的有资格更进一步吗？」打败它！',1)}
-function tribSuccess(){const was=G.realm;G.realm++;G.trib=null;applyOrigin();G.hp=G.maxhp;G.sta=G.maxsta;G.mana=G.maxmana;G.qi=Math.max(0,G.qi-REALMS[G.realm].qi);
+function tribSuccess(){sfx('levelup');const was=G.realm;G.realm++;G.trib=null;applyOrigin();G.hp=G.maxhp;G.sta=G.maxsta;G.mana=G.maxmana;G.qi=Math.max(0,G.qi-REALMS[G.realm].qi);
   burst(P.x,P.y+1,P.z,MAT.gold,30,5);burst(P.x,P.y+1,P.z,MAT.crystal,20,4);ftxt(P.x,P.y+3,P.z,'突破！','lvup');
   const ns=Object.keys(SKILLS).filter(k=>SKILLS[k].realm===G.realm).map(k=>SKILLS[k].n()).join('、');
   toast((G.faction==='A'?'渡劫成功！':'过载突破成功！')+realmN(was)+' → '+realmN(G.realm)+'：生命、灵力、攻击大幅提升'+(ns?'；新技能：'+ns+'（按「换」切换技能）':''),1);gainXP(100);save()}

@@ -42,7 +42,7 @@ const ACT=[],PROJ=[],LATER=[],RESP=[];
 const later=(t,fn)=>LATER.push({t,fn});
 const has=(c)=>Object.entries(c).every(([k,v])=>(G.inv[k]||0)>=v);
 const take=(c)=>{for(const k in c)G.inv[k]=(G.inv[k]||0)-c[k]};
-const give=(c)=>{for(const k in c)G.inv[k]=(G.inv[k]||0)+c[k]};
+const give=(c)=>{for(const k in c)G.inv[k]=(G.inv[k]||0)+c[k];sfx('pickup')};
 const fmtCost=(c)=>Object.entries(c).map(([k,v])=>ITEM[k]+v).join(' ');
 const ui={toast:()=>{},refresh:()=>{},trade:()=>{},end:()=>{},death:()=>{},bossBar:()=>{}};
 function toast(t,long){ui.toast(t,long)}
@@ -106,10 +106,10 @@ const dist2=(o)=>(o.x-P.x)**2+(o.z-P.z)**2;
 function tryBuild(id){const r=RECIPES.find(r=>r.id===id);const fx=Math.sin(P.yaw),fz=Math.cos(P.yaw);let x=P.x+fx*2.6,z=P.z+fz*2.6;
   if(id==='boat'){const Z=ZONES.river;if(Math.hypot(P.x-Z.x,P.z-Z.z)>Z.r+6){toast('灵舟只能在「灵河渡口」建造（地图上的⚓）');return false}x=riverX(Z.z)-8;z=Z.z+3.6;if(G.builds.some(b=>b.t==='boat')){toast('已经造好灵舟了');return false}}
   else{if(WATER_Y-groundAt(x,z)>-.2){toast('这里是水里，换个地方');return false}for(const c of nearCols(x,z))if(!c.off&&Math.hypot(c.x-x,c.z-z)<c.r+1.2){toast('前面有东西挡着，换个空地');return false}}
-  take(r.cost);placeBuild(id,x,z,P.yaw+Math.PI);play(P.model,'gather',.6);burst(x,groundAt(x,z)+.5,z,MAT.wood,10);toast('建好了：'+r.n);G.flags['b_'+id]=1;gainXP(10);return true}
+  take(r.cost);sfx('build');placeBuild(id,x,z,P.yaw+Math.PI);play(P.model,'gather',.6);burst(x,groundAt(x,z)+.5,z,MAT.wood,10);toast('建好了：'+r.n);G.flags['b_'+id]=1;gainXP(10);return true}
 function craft(id){const r=RECIPES.find(r=>r.id===id);if(!r||!has(r.cost))return false;
   if(r.k==='build')return tryBuild(id);
-  take(r.cost);if(r.fn)r.fn();else if(r.give)give(r.give);else{G.tools[id]=true;if(WEAPONS[id])equip(id);if(id==='canteen')G.water=0;if(id==='glider')toast('有了滑翔伞：跳起来后在空中按住「跳」就能滑翔');if(id==='thunder')toast('火符升级为雷符！')}
+  sfx('craft');take(r.cost);if(r.fn)r.fn();else if(r.give)give(r.give);else{G.tools[id]=true;if(WEAPONS[id])equip(id);if(id==='canteen')G.water=0;if(id==='glider')toast('有了滑翔伞：跳起来后在空中按住「跳」就能滑翔');if(id==='thunder')toast('火符升级为雷符！')}
   G.flags['c_'+id]=1;toast('做好了：'+r.n);gainXP(3);return true}
 function equip(w){if(w!=='fist'&&!G.tools[w])return;G.weapon=w;if(P.model.rig)setProp(P.model,WEAPONS[w].prop);else if(P.model.glb)attachGLBProp(WEAPONS[w].prop);ui.refresh()}
 function nextWeapon(){const own=WORDER.filter(w=>w==='fist'||G.tools[w]);const i=own.indexOf(G.weapon);equip(own[(i+1)%own.length]);toast('换成：'+WEAPONS[G.weapon].n)}
@@ -136,15 +136,15 @@ function populate(){
 
 /* ---------- 伤害 ---------- */
 function hurtPlayer(d,fx,fz){if(G.dead||G.over||P.inv>0)return;P.inv=.35;G.med=false;if(P.st==='sit'||P.sitFire){P.sitFire=null;G.timeScale=1}if(G.perks&&G.perks.xuanjia)d*=.85;if(G.realm>=3)d*=.9;
-  G.hp-=d;ftxt(P.x,P.y+1.9,P.z,'-'+Math.round(d),'hurt');burst(P.x,P.y+1.1,P.z,bloodMat,4,2);const dx=P.x-fx,dz=P.z-fz,l=Math.hypot(dx,dz)||1;P.kx=dx/l*7;P.kz=dz/l*7;
+  G.hp-=d;sfx('hurt');ftxt(P.x,P.y+1.9,P.z,'-'+Math.round(d),'hurt');burst(P.x,P.y+1.1,P.z,bloodMat,4,2);const dx=P.x-fx,dz=P.z-fz,l=Math.hypot(dx,dz)||1;P.kx=dx/l*7;P.kz=dz/l*7;
   if(P.model)play(P.model,'hurt',.3);$('#hurt').classList.remove('on');void $('#hurt').offsetWidth;$('#hurt').classList.add('on');if(navigator.vibrate)try{navigator.vibrate(40)}catch(e){}
   if(G.hp<=0){if(G.trib){tribFail();return}G.hp=0;die()}}
-function die(){G.flying=false;G.med=false;G.dead=true;P.st='dead';later(1.6,()=>ui.death())}
-function hurtActor(a,d,fx,fz,kb=5,stun=0){if(a.dead)return;a.hp-=d;a.hitT=4;a.pop=.15;ftxt(a.x,a.y+a.h,a.z,Math.round(d),d>=30?'crit':'');
+function die(){sfx('death');G.flying=false;G.med=false;G.dead=true;P.st='dead';later(1.6,()=>ui.death())}
+function hurtActor(a,d,fx,fz,kb=5,stun=0){if(a.dead)return;a.hp-=d;sfx(a.beast?'flesh':'hit',d>=30);a.hitT=4;a.pop=.15;ftxt(a.x,a.y+a.h,a.z,Math.round(d),d>=30?'crit':'');
   burst(a.x,a.y+a.h*.6,a.z,a.beast?bloodMat:hitMat,5,2.4);const dx=a.x-fx,dz=a.z-fz,l=Math.hypot(dx,dz)||1;const kk=a.boss?kb*.25:kb;a.kx=dx/l*kk;a.kz=dz/l*kk;a.stun=Math.max(a.stun||0,stun);
   a.angry=true;if(a.human)play(a.obj,'hurt',.3);else a.obj.act={k:'hurt',t:0,d:.3};if(a.def&&a.def.flee){a.wound=true;a.tired=Math.max(a.tired||0,1.2)}
   if(a.hp<=0){a.hp=0;a.dead=true;a.deadT=0;gainXP(Math.round((a.boss?300:a.xinmo?150:a.guard2?120:a.human?30:({rabbit:5,deer:10,boar:20,wolf:25,ghost:18}[a.kind]||10))*DIFF));if(!a.human)gainQi(a.guard2?30:4);if(a.human){a.obj.act=null}
-    if(a.boss){G.bossDead=true;ui.bossBar(null);bossDefeated(a)}
+    sfx(a.boss?'gong':'kill');if(a.boss){G.bossDead=true;ui.bossBar(null);bossDefeated(a)}
     else if(a.xinmo){tribSuccess()}
     else if(a.ghost){gainQi(8);const l={};if(Math.random()<.45)l.ling=1;if(Math.random()<.25)l.herb=1;if(Object.keys(l).length)give(l);toast('游魂消散'+(Object.keys(l).length?'：'+fmtCost(l):'')+'，灵气 +8')}
     else if(a.human){const l={ling:1+(Math.random()<.5?1:0)};if(Math.random()<.3)l.potion=1;if(G.faction==='B'&&Math.random()<.4)l.arrow=3;give(l);toast('击败'+a.name+'：'+fmtCost(l));RESP.push({t:300,fn:()=>!G.bossDead&&spawnSoldier(...(randAround(ZONES.enemy.x,ZONES.enemy.z,4,20)||[ZONES.enemy.x,ZONES.enemy.z]))})}
@@ -158,31 +158,31 @@ function frontTree(){let best=null,bd=1e9;const fx=Math.sin(P.yaw),fz=Math.cos(P
 function frontRock(){let best=null,bd=1e9;for(const n of nodes){if(n.kind!=='rock'||!n.alive)continue;const d=Math.hypot(n.x-P.x,n.z-P.z);if(d<n.s*1.1+1.4&&d<bd){bd=d;best=n}}return best}
 function busy(){return G.dead||G.over||G.paused||P.st==='sleep'||P.lock>0}
 function attack(){if(busy()||P.atkCd>0)return;if(P.sitFire){P.sitFire=null;G.timeScale=1}const w=WEAPONS[G.weapon];
-  let foe=nearestFoe(w.range+1.8,null);if(foe&&P.st!=='swim'){P.yaw=Math.atan2(foe.x-P.x,foe.z-P.z);P.atkCd=w.cd;P.sta=Math.max(0,G.sta-=4);play(P.model,'swing',w.cd*.95);later(.17,()=>{const n=meleeHit(w.range,w.dmg*G.atkMul,1.1,G.weapon==='spear'?7:5);if(n)shake(.12)});return}
+  let foe=nearestFoe(w.range+1.8,null);if(foe&&P.st!=='swim'){P.yaw=Math.atan2(foe.x-P.x,foe.z-P.z);P.atkCd=w.cd;P.sta=Math.max(0,G.sta-=4);play(P.model,'swing',w.cd*.95);sfx('swing');later(.17,()=>{const n=meleeHit(w.range,w.dmg*G.atkMul,1.1,G.weapon==='spear'?7:5);if(n)shake(.12)});return}
   const t=frontTree();if(t){let ww=G.weapon;if(!WEAPONS[ww].chop||WEAPONS[ww].chop<1.5){const b=['axe','shovel'].find(k=>G.tools[k]);if(b){equip(b);ww=b}}
-    P.yaw=Math.atan2(t.x-P.x,t.z-P.z);P.atkCd=.62;play(P.model,'chop',.6);later(.33,()=>{if(!t.alive)return;t.hp-=WEAPONS[ww].chop;burst(t.x-Math.sin(P.yaw)*.3,P.y+1.1,t.z-Math.cos(P.yaw)*.3,MAT.wood,5,2.2);shake(.06);
+    P.yaw=Math.atan2(t.x-P.x,t.z-P.z);P.atkCd=.62;play(P.model,'chop',.6);later(.33,()=>{if(!t.alive)return;t.hp-=WEAPONS[ww].chop;sfx('chop');burst(t.x-Math.sin(P.yaw)*.3,P.y+1.1,t.z-Math.cos(P.yaw)*.3,MAT.wood,5,2.2);shake(.06);
       if(t.hp<=0.01){const dx=t.x-P.x,dz=t.z-P.z,l=Math.hypot(dx,dz)||1;fellTree(t,dx/l,dz/l);toast('树倒了！');
         later(1.5,()=>{const w=TREE_TYPES[t.type].wood;give({wood:w});toast('木头 +'+w);G.flags.chop=(G.flags.chop||0)+1;gainXP(4);
           RESP.push({t:240,fn:function f(){if(dist2(t)<900){RESP.push({t:30,fn:f});return}t.alive=true;t.hp=TREE_TYPES[t.type].hits;setTree(t,true)}})})}});return}
   const r=frontRock();if(r){let ww=G.weapon;if(WEAPONS[ww].mine<2){const b=['pick','shovel'].find(k=>G.tools[k]);if(b){equip(b);ww=b}}
-    P.yaw=Math.atan2(r.x-P.x,r.z-P.z);P.atkCd=.65;play(P.model,'chop',.62);later(.34,()=>{if(!r.alive)return;r.hp-=WEAPONS[ww].mine;burst(r.x,r.y+.6,r.z,MAT.rock2,6,2.6);shake(.06);
+    P.yaw=Math.atan2(r.x-P.x,r.z-P.z);P.atkCd=.65;play(P.model,'chop',.62);later(.34,()=>{if(!r.alive)return;r.hp-=WEAPONS[ww].mine;sfx('mine');burst(r.x,r.y+.6,r.z,MAT.rock2,6,2.6);shake(.06);
       if(r.hp<=0.01){r.alive=false;setNode(r,false);const l={stone:3};if(Math.random()<.35)l.salt=1;const good=WEAPONS[ww].mine>=2;const inMine=zoneOf(r.x,r.z)==='mine';if(good&&Math.random()<(inMine?.55:.18))l.ling=1;give(l);toast('采到：'+fmtCost(l)+(good?'':'（用石镐才挖得出灵石）'));gainXP(5);
         RESP.push({t:260,fn:function f(){if(dist2(r)<700){RESP.push({t:30,fn:f});return}r.alive=true;r.hp=4;setNode(r,true)}})}});return}
-  P.atkCd=w.cd;play(P.model,'swing',w.cd*.95);later(.17,()=>meleeHit(w.range,w.dmg*G.atkMul))}
+  P.atkCd=w.cd;play(P.model,'swing',w.cd*.95);sfx('swing');later(.17,()=>meleeHit(w.range,w.dmg*G.atkMul))}
 function shoot(kind,a,spd,dmg){const fx=Math.sin(P.yaw),fz=Math.cos(P.yaw);let m;
   if(kind==='fire'||kind==='thunder'){m=new THREE.Mesh(new THREE.SphereGeometry(.22,12,8),new THREE.MeshBasicMaterial({color:kind==='fire'?'#ffb040':'#9ad8ff'}));const h=new THREE.Mesh(new THREE.SphereGeometry(.42,12,8),new THREE.MeshBasicMaterial({color:kind==='fire'?'#ff6a20':'#4aa0ff',transparent:true,opacity:.45,blending:THREE.AdditiveBlending,depthWrite:false}));m.add(h)}
   else if(kind==='bolt'){m=new THREE.Mesh(new THREE.CylinderGeometry(.02,.02,.7,5).rotateX(Math.PI/2),MAT.wood)}
   else if(kind==='bomb'){m=new THREE.Mesh(new THREE.SphereGeometry(.2,10,8),MAT.dark)}else{m=new THREE.Mesh(new THREE.DodecahedronGeometry(.12,0),MAT.pebble)}
   let vx=fx*spd,vz=fz*spd,vy=kind==='bomb'?7:kind==='stone'?3:0;let sy=P.y+1.4;
   if(a){const dx=a.x-P.x,dz=a.z-P.z,d=Math.hypot(dx,dz);vx=dx/d*spd;vz=dz/d*spd;if(kind==='bomb'){const t=d/spd;vy=(a.y-sy)/t+9*t}else if(kind!=='stone')vy=(a.y+a.h*.6-sy)/(d/spd);else{const t=d/spd;vy=(a.y+a.h*.6-sy)/t+9*t}}
-  m.position.set(P.x+fx*.6,sy,P.z+fz*.6);scene.add(m);PROJ.push({m,vx,vy,vz,kind,dmg,t:0,g:kind==='bomb'||kind==='stone'?18:0})}
+  sfx(kind==='fire'?'fire':kind==='thunder'?'thunderShot':kind==='bolt'?'bow':'throw');m.position.set(P.x+fx*.6,sy,P.z+fz*.6);scene.add(m);PROJ.push({m,vx,vy,vz,kind,dmg,t:0,g:kind==='bomb'||kind==='stone'?18:0})}
 function skill(){if(busy()||P.atkCd>0)return;if(G.skillSel&&G.skillSel!=='base'){castSkill(G.skillSel);return}const a=nearestFoe(32,.9);if(a)P.yaw=Math.atan2(a.x-P.x,a.z-P.z);
   if(G.faction==='A'){if(G.mana<20){toast('灵力不足（每秒自动恢复）');return}G.mana-=20;const th=G.tools.thunder;play(P.model,'throw',.45);P.atkCd=.5;later(.2,()=>shoot(th?'thunder':'fire',a,24,(th?44:30)*G.atkMul*G.skillMul));return}
   if(G.tools.bow&&(G.inv.arrow||0)>0){G.inv.arrow--;play(P.model,'throw',.35);P.atkCd=.55;later(.12,()=>shoot('bolt',a,42,40*G.atkMul*G.skillMul));return}
   if((G.inv.bomb||0)>0){G.inv.bomb--;play(P.model,'throw',.5);P.atkCd=.8;later(.25,()=>shoot('bomb',a,14,65));return}
   if((G.inv.stone||0)>0){G.inv.stone--;play(P.model,'throw',.45);P.atkCd=.5;later(.2,()=>shoot('stone',a,20,9*G.atkMul));if(!G.tools.bow)toast('扔了块石头（做「弩」后技能键会射弩箭）');return}
   toast(G.tools.bow?'没有弩箭了，去制造':'没有可扔的东西')}
-function explode(x,y,z,r,dmg){burst(x,y+.3,z,MAT.flame2,14,6);burst(x,y+.3,z,MAT.dark,8,5);shake(.35);for(const a of ACT){if(a.dead)continue;const d=Math.hypot(a.x-x,a.z-z);if(d<r)hurtActor(a,dmg*(1-d/r*.5),x,z,9)}if(Math.hypot(P.x-x,P.z-z)<r*.6)hurtPlayer(15,x,z)}
+function explode(x,y,z,r,dmg){sfx('boom');burst(x,y+.3,z,MAT.flame2,14,6);burst(x,y+.3,z,MAT.dark,8,5);shake(.35);for(const a of ACT){if(a.dead)continue;const d=Math.hypot(a.x-x,a.z-z);if(d<r)hurtActor(a,dmg*(1-d/r*.5),x,z,9)}if(Math.hypot(P.x-x,P.z-z)<r*.6)hurtPlayer(15,x,z)}
 function updProj(dt){for(let i=PROJ.length-1;i>=0;i--){const p=PROJ[i];p.t+=dt;p.vy-=p.g*dt;p.m.position.x+=p.vx*dt;p.m.position.y+=p.vy*dt;p.m.position.z+=p.vz*dt;const q=p.m.position;
   if(p.kind==='bolt')p.m.lookAt(q.x+p.vx,q.y+p.vy,q.z+p.vz);if(p.kind==='fire'||p.kind==='thunder'){p.m.children[0].scale.setScalar(1+Math.sin(p.t*30)*.2);if(Math.random()<.4)burst(q.x,q.y,q.z,p.kind==='fire'?MAT.flame2:hitMat,1,.6)}
   let done=p.t>3||q.y<groundAt(q.x,q.z);
@@ -191,10 +191,10 @@ function updProj(dt){for(let i=PROJ.length-1;i>=0;i--){const p=PROJ[i];p.t+=dt;p
 let shakeK=0;const shake=k=>shakeK=Math.max(shakeK,k);
 
 function eat(){if(busy())return;
-  if(G.hp<G.maxhp*.5&&(G.inv.potion||0)>0){G.inv.potion--;G.hp=Math.min(G.maxhp,G.hp+50);play(P.model,'eat',.8);toast('服下疗伤药 生命+50');ftxt(P.x,P.y+2,P.z,'+50','heal');return}
+  if(G.hp<G.maxhp*.5&&(G.inv.potion||0)>0){G.inv.potion--;G.hp=Math.min(G.maxhp,G.hp+50);play(P.model,'eat',.8);sfx('eat');toast('服下疗伤药 生命+50');ftxt(P.x,P.y+2,P.z,'+50','heal');return}
   const foods=[['cooked',38,6,'烤肉'],['grain',26,3,'灵谷'],['berry',9,1,'浆果'],['meat',12,-6,'生肉（会闹肚子）']];
   if(G.hunger>96){toast('还不饿');return}
-  for(const [k,h,hp,n] of foods)if((G.inv[k]||0)>0){G.inv[k]--;G.hunger=Math.min(100,G.hunger+h);G.hp=clamp(G.hp+hp,1,G.maxhp);play(P.model,'eat',.8);toast('吃了'+n+' 饱食+'+h);return}
+  for(const [k,h,hp,n] of foods)if((G.inv[k]||0)>0){G.inv[k]--;G.hunger=Math.min(100,G.hunger+h);G.hp=clamp(G.hp+hp,1,G.maxhp);play(P.model,'eat',.8);sfx('eat');toast('吃了'+n+' 饱食+'+h);return}
   if((G.inv.potion||0)>0&&G.hp<G.maxhp){G.inv.potion--;G.hp=Math.min(G.maxhp,G.hp+50);toast('服下疗伤药 生命+50');return}
   toast('没有吃的：摘浆果、打猎烤肉，或者种灵谷')}
 
@@ -246,7 +246,7 @@ function updPlayer(dt){const h=P.model;P.atkCd-=dt;P.inv-=dt;P.lock-=dt;
   const gy=groundAt(P.x,P.z);
   if(swim&&P.y<WATER_Y+.3){P.y=lerp(P.y,WATER_Y-.45,Math.min(1,dt*6));P.vy=0;P.ground=false;P.st='swim';if(IN.jump&&depth<2){P.vy=6.5;P.y=WATER_Y+.32;P.st='air'}}
   else{
-    if(IN.jump&&P.ground&&G.sta>6&&P.lock<=0&&!G.flying){P.vy=8.6;P.ground=false;G.sta-=6;P.dj=0}else if(IN.jump&&!P.ground&&G.realm>=1&&!P.dj&&G.sta>8&&!G.flying){P.vy=8.2;P.dj=1;G.sta-=8;burst(P.x,P.y,P.z,hitMat,6,2)}
+    if(IN.jump&&P.ground&&G.sta>6&&P.lock<=0&&!G.flying){sfx('jump');P.vy=8.6;P.ground=false;G.sta-=6;P.dj=0}else if(IN.jump&&!P.ground&&G.realm>=1&&!P.dj&&G.sta>8&&!G.flying){P.vy=8.2;P.dj=1;G.sta-=8;burst(P.x,P.y,P.z,hitMat,6,2)}
     const upd=inUpdraft();const gliding=!G.flying&&!P.ground&&IN.jumpHeld&&(G.tools.glider||G.realm>=1)&&(P.vy<-.5||(upd&&P.st==='glide'))&&G.sta>0&&P.y-gy>1.2;
     if(G.flying){P.vy=IN.jumpHeld?6:-1.3}else{P.vy-=(gliding?6:22)*dt;if(gliding){P.vy=upd?Math.min(P.vy+22*dt,7.5):Math.max(P.vy,-1.9);G.sta-=(upd?0:2.5)*dt}}
     P.y+=P.vy*dt;if(P.y<=gy){P.y=gy;P.vy=0;P.ground=true}else if(P.y-gy>.25||P.vy>0)P.ground=false;
@@ -319,7 +319,7 @@ function breakthrough(){const A=G.faction==='A';if(G.realm){toast(A?'你已是�
   take(need);G.realm=1;applyOrigin();G.hp=G.maxhp;G.sta=G.maxsta;G.mana=G.maxmana;G.flags.realm=1;P.lock=1.4;P.st='kneel';const fu=CH2OBJ.furnace;burst(fu.x,fu.obj.position.y+2,fu.z,MAT.flame,16,3);burst(P.x,P.y+1,P.z,hitMat,14,3);shake(.2);
   toast(A?'突破成功！炼气 → 筑基：生命 +30、体力 +20、灵力 +40、攻击 +20%':'改造完成！生命 +30、体力 +20、攻击 +20%',1);save()}
 function openChest_old(){const c=CH2OBJ.chest;if(ACT.some(a=>a.guard2&&!a.dead)){toast('守山灵兽还在，先打败它们');return}
-  G.flags.chest=1;c.lid.rotation.x=-1.9;c.glow.visible=false;G.tools.xian=true;WEAPONS.xian.n=G.faction==='A'?'仙剑·流云':'合金战刀';give({ling:6,herb:5,potion:2});equip('xian');burst(c.x,c.obj.position.y+1,c.z,MAT.crystal,18,3);
+  G.flags.chest=1;sfx('chest');c.lid.rotation.x=-1.9;c.glow.visible=false;G.tools.xian=true;WEAPONS.xian.n=G.faction==='A'?'仙剑·流云':'合金战刀';give({ling:6,herb:5,potion:2});equip('xian');burst(c.x,c.obj.position.y+1,c.z,MAT.crystal,18,3);
   toast('获得秘境神兵「'+WEAPONS.xian.n+'」（伤害 48），以及 灵石6 灵草5 疗伤药2',1);save()}
 function startChapter2(){travel(ROUTE()[1]);return;const s={v:1,ch:2,faction:G.faction,origin:G.origin,inv:G.inv,tools:G.tools,hp:G.maxhp,hunger:Math.max(70,G.hunger),sta:G.maxsta,mana:G.maxmana,hour:9,day:G.day+1,weapon:G.weapon,water:G.water,flags:{},bossDead:false,x:null,z:null,builds:[],realm:0,lv:G.lv,xp:G.xp,pts:G.pts,st:G.st};
   try{writeSave(s);sessionStorage.setItem('td5_auto','1')}catch(e){}location.reload()}
@@ -328,7 +328,7 @@ function startChapter2(){travel(ROUTE()[1]);return;const s={v:1,ch:2,faction:G.f
 function quest(){return CH===2?quest2():questFull()}   // 第一章任务链见 p7_guide.js（新手引导 + 主线）
 
 function openChest(){const c=CH2OBJ.chest;if(ACT.some(a=>a.guard2&&!a.dead)){toast('守山灵兽还在，先打败它们');return}
-  G.flags.chest=1;c.lid.rotation.x=-1.9;c.glow.visible=false;const l={ling:5,herb:4,potion:1,fu:2};if(REGD.mat)l[regMat(REGK)]=4;give(l);gainQi(60);burst(c.x,c.obj.position.y+1,c.z,MAT.crystal,18,3);
+  G.flags.chest=1;sfx('chest');c.lid.rotation.x=-1.9;c.glow.visible=false;const l={ling:5,herb:4,potion:1,fu:2};if(REGD.mat)l[regMat(REGK)]=4;give(l);gainQi(60);burst(c.x,c.obj.position.y+1,c.z,MAT.crystal,18,3);
   let msg='秘境宝箱：'+fmtCost(l)+'，灵气 +60';if(!G.tools.xian){G.tools.xian=true;WEAPONS.xian.n=G.faction==='A'?'仙剑·流云':'合金战刀';equip('xian');msg+='，以及秘境神兵「'+WEAPONS.xian.n+'」'}toast(msg,1);save()}
 function quest2(){const f=G.flags,A=G.faction==='A';const steps=[
     [()=>f.merchant,'去「'+ZONES.market.name+'」找商人打听'+REGD.n+'的消息'],
@@ -358,7 +358,7 @@ function applyOrigin(){const o=G.origin,RB=REALMS[G.realm||0];G.maxhp=(o==='天'
 const needXP=l=>40+l*35;
 function rankName(){return realmN(G.realm||0)+' · '+G.lv+' 级'}
 function gainXP(n){if(G.over||!G.started)return;G.xp+=n;ftxt(P.x,P.y+2.3,P.z,'+'+n+' 经验','xp');let up=0;while(G.lv<50&&G.xp>=needXP(G.lv)){G.xp-=needXP(G.lv);G.lv++;G.pts+=2;up++}
-  if(up){const r=G.hp/G.maxhp;applyOrigin();G.hp=G.maxhp;G.sta=G.maxsta;if(G.maxmana)G.mana=G.maxmana;burst(P.x,P.y+1,P.z,MAT.gold,18,3);ftxt(P.x,P.y+2.8,P.z,'升级！','lvup');
+  if(up){sfx('levelup');const r=G.hp/G.maxhp;applyOrigin();G.hp=G.maxhp;G.sta=G.maxsta;if(G.maxmana)G.mana=G.maxmana;burst(P.x,P.y+1,P.z,MAT.gold,18,3);ftxt(P.x,P.y+2.8,P.z,'升级！','lvup');
     toast('升级了！'+rankName()+'：生命体力回满，获得 '+(2*up)+' 个属性点（点左上角「加点」）',1);save()}}
 async function startGame(fac,origin,sv){G.starting=true;try{await grokPreload()}catch(e){}
   G.faction=fac;G.origin=origin;G.realm=sv&&sv.realm||0;G.lv=sv&&sv.lv||1;G.xp=sv&&sv.xp||0;G.pts=sv&&sv.pts||0;G.st=Object.assign({str:0,vit:0,agi:0,spi:0},sv&&sv.st||{});Object.assign(G,{qi:sv&&sv.qi||0,wtier:sv&&sv.wtier||0,cleared:sv&&sv.cleared||{},bases:sv&&sv.bases||{},rflags:sv&&sv.rflags||{},perks:sv&&sv.perks||{},skillSel:sv&&sv.skillSel||'base'});applyOrigin();G.hp=G.maxhp;G.sta=G.maxsta;G.mana=G.maxmana;G.inv={};G.tools={};

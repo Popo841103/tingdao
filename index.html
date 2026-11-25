@@ -161,7 +161,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#9fd3ea;font-family:"P
 <div class="modal" id="route"><div class="pan"><h2>九州航线图<button class="x" data-close="route">✕</button></h2><div class="lore">每击败一州的首领，就解锁去下一州的航线。越往后越难，终点是「天墟·九州之巅」。去过的州随时可以回去。</div><div class="list" id="rlist"></div></div></div>
 <div class="modal" id="stat"><div class="pan"><h2>人物 · 加点<button class="x" data-close="stat">✕</button></h2><div class="lore" id="slv"></div><div class="list" id="slist"></div><div class="lore" id="sder"></div></div></div>
 <div class="modal" id="set"><div class="pan"><h2>设置<button class="x" data-close="set">✕</button></h2>
-  <div class="srow"><button id="qBtn">画质</button><button id="saveBtn">立即存档</button><button id="quitBtn">保存并回到主菜单</button></div>
+  <div class="srow"><button id="qBtn">画质</button><button id="sndBtn">音效：开</button><button id="musBtn">音乐：开</button><button id="saveBtn">立即存档</button><button id="quitBtn">保存并回到主菜单</button></div>
   <div class="lore"><b>存档备份</b>：存档只保存在这个浏览器里，换手机或清理缓存会丢失。可以导出成文件保存，之后再导入。</div>
   <div class="srow"><button id="expBtn">导出存档</button><button id="impBtn">导入存档</button><input type="file" id="impIn" accept=".json,application/json" style="display:none"></div>
   <div class="lore"><b>替换主角模型（Tripo 导出的 .glb）</b><br>选择文件后马上替换，并记住，下次打开自动使用。</div>
@@ -357,6 +357,92 @@ function nearCols(x,z){const out=[],cx=Math.floor(x/GRID),cz=Math.floor(z/GRID);
 function collide(x,z,r){for(const c of nearCols(x,z)){if(c.off)continue;const dx=x-c.x,dz=z-c.z,d=Math.hypot(dx,dz),m=c.r+r;if(d<m&&d>1e-4){x=c.x+dx/d*m;z=c.z+dz/d*m}}
   const d=Math.hypot(x,z);if(d>coastR(x,z)+30){const s=(coastR(x,z)+30)/d;x*=s;z*=s}return[x,z]}
 
+/* ---------- 声音：全部用 Web Audio 实时合成（不需要音频文件，没有版权问题） ----------
+   sfx('名字') 播放音效；背景音乐是程序生成的古风五声音阶（古筝式拨弦 + 低音铺底），
+   白天明亮、夜里低沉，附近有敌人时加入战鼓。设置里可以分别开关音效和音乐。 */
+const AUD={ctx:null,master:null,sfxG:null,musG:null,rev:null,on:{sfx:true,mus:true},last:{},mus:null};
+try{const s=JSON.parse(localStorage.getItem('td5_snd')||'null');if(s)AUD.on=Object.assign(AUD.on,s)}catch(e){}
+function audInit(){if(AUD.ctx){if(AUD.ctx.state==='suspended')AUD.ctx.resume().catch(()=>{});return}
+  const C=window.AudioContext||window.webkitAudioContext;if(!C)return;let c;try{c=new C()}catch(e){return}AUD.ctx=c;
+  AUD.master=c.createGain();AUD.master.gain.value=.9;AUD.master.connect(c.destination);
+  const comp=c.createDynamicsCompressor();comp.threshold.value=-14;comp.ratio.value=4;comp.connect(AUD.master);
+  AUD.sfxG=c.createGain();AUD.sfxG.gain.value=AUD.on.sfx?.8:0;AUD.sfxG.connect(comp);
+  AUD.musG=c.createGain();AUD.musG.gain.value=AUD.on.mus?.32:0;AUD.musG.connect(comp);
+  // 混响：用衰减的噪声做脉冲响应
+  const len=c.sampleRate*2.6,ir=c.createBuffer(2,len,c.sampleRate);for(let ch=0;ch<2;ch++){const d=ir.getChannelData(ch);for(let i=0;i<len;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/len,3)}
+  AUD.rev=c.createConvolver();AUD.rev.buffer=ir;const rg=c.createGain();rg.gain.value=.38;AUD.rev.connect(rg);rg.connect(comp);
+  const nb=c.createBuffer(1,c.sampleRate,c.sampleRate),nd=nb.getChannelData(0);for(let i=0;i<nd.length;i++)nd[i]=Math.random()*2-1;AUD.noise=nb;
+  if(c.state==='suspended')c.resume().catch(()=>{});musStart()}
+['pointerdown','touchstart','keydown','click'].forEach(e=>window.addEventListener(e,audInit,{capture:true,passive:true}));
+document.addEventListener('visibilitychange',()=>{if(!AUD.ctx)return;if(document.hidden)AUD.ctx.suspend().catch(()=>{});else AUD.ctx.resume().catch(()=>{})});
+function audSet(k,v){AUD.on[k]=v;try{localStorage.setItem('td5_snd',JSON.stringify(AUD.on))}catch(e){}if(!AUD.ctx)return;const t=AUD.ctx.currentTime;
+  if(k==='sfx')AUD.sfxG.gain.setTargetAtTime(v?.8:0,t,.05);if(k==='mus')AUD.musG.gain.setTargetAtTime(v?.32:0,t,.3)}
+
+/* 基本发声单元 */
+function tone(o){const c=AUD.ctx,t=c.currentTime+(o.at||0);const os=c.createOscillator(),g=c.createGain();os.type=o.type||'sine';os.frequency.setValueAtTime(o.f,t);if(o.f2)os.frequency.exponentialRampToValueAtTime(Math.max(20,o.f2),t+(o.slide||o.d));if(o.det)os.detune.value=o.det;
+  const v=o.v||.3,a=o.a||.005;g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(v,t+a);g.gain.exponentialRampToValueAtTime(.0001,t+o.d);
+  let n=g;if(o.lp){const f=c.createBiquadFilter();f.type='lowpass';f.frequency.value=o.lp;g.connect(f);n=f}os.connect(g);n.connect(o.out||AUD.cur||AUD.sfxG);if(o.rv){const s=c.createGain();s.gain.value=o.rv;n.connect(s);s.connect(AUD.rev)}os.start(t);os.stop(t+o.d+.05)}
+function noise(o){const c=AUD.ctx,t=c.currentTime+(o.at||0);const s=c.createBufferSource();s.buffer=AUD.noise;s.loop=true;const f=c.createBiquadFilter();f.type=o.ft||'bandpass';f.frequency.setValueAtTime(o.f||1000,t);if(o.f2)f.frequency.exponentialRampToValueAtTime(o.f2,t+o.d);f.Q.value=o.q||1;
+  const g=c.createGain(),v=o.v||.3;g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(v,t+(o.a||.004));g.gain.exponentialRampToValueAtTime(.0001,t+o.d);s.connect(f);f.connect(g);g.connect(o.out||AUD.cur||AUD.sfxG);if(o.rv){const r=c.createGain();r.gain.value=o.rv;g.connect(r);r.connect(AUD.rev)}s.start(t,Math.random()*.5);s.stop(t+o.d+.05)}
+const PENTA=[0,2,4,7,9];const hz=(m)=>440*Math.pow(2,(m-69)/12);
+function pluck(m,at,v,out,d){const f=hz(m);tone({f,type:'triangle',d:d||1.4,v:v||.18,at,a:.003,lp:3200,out,rv:.5});tone({f:f*2,type:'sine',d:(d||1.4)*.5,v:(v||.18)*.35,at,a:.002,out,rv:.3});tone({f:f*1.003,type:'sawtooth',d:.12,v:(v||.18)*.25,at,lp:2400,out})}
+
+const SFX={
+  swing:()=>noise({f:900,f2:2600,q:1.4,d:.18,v:.22,a:.03}),
+  hit:(k)=>{tone({f:150,f2:55,d:.16,v:.5,type:'sine'});noise({f:1800,q:.8,d:.07,v:.3});if(k)tone({f:880,f2:440,d:.18,v:.12,type:'square',lp:2000})},
+  flesh:()=>{tone({f:120,f2:50,d:.18,v:.5});noise({ft:'lowpass',f:900,d:.12,v:.35})},
+  chop:()=>{tone({f:340,f2:220,d:.09,v:.35,type:'triangle'});noise({f:700,q:3,d:.08,v:.35})},
+  treefall:()=>{noise({ft:'lowpass',f:500,f2:120,d:1.1,v:.35,a:.3});tone({f:70,f2:40,d:.6,v:.5,at:.9});noise({ft:'lowpass',f:300,d:.4,v:.4,at:.9})},
+  mine:()=>{tone({f:1250+Math.random()*200,d:.22,v:.18,type:'square',lp:3000,rv:.2});noise({f:2500,q:2,d:.06,v:.3})},
+  pickup:()=>{const b=74;pluck(b+12,0,.14,null,.5);pluck(b+19,.07,.12,null,.6)},
+  craft:()=>{tone({f:900,d:.12,v:.15,type:'square',lp:2500});tone({f:900,d:.12,v:.15,type:'square',lp:2500,at:.14});[0,4,7].forEach((s,i)=>pluck(72+s,.3+i*.06,.13,null,.9))},
+  levelup:()=>{[0,2,4,7,9,12,16].forEach((s,i)=>pluck(67+s,i*.07,.16,null,1.6));tone({f:hz(91),d:2.2,v:.08,at:.5,rv:.8})},
+  quest:()=>{[0,4,7,12].forEach((s,i)=>pluck(72+s,i*.09,.15,null,1.2))},
+  hurt:()=>{tone({f:200,f2:80,d:.22,v:.45,type:'sawtooth',lp:900});noise({ft:'lowpass',f:700,d:.15,v:.3})},
+  death:()=>{[0,-2,-5,-7,-12].forEach((s,i)=>pluck(62+s,i*.28,.16,null,2))},
+  fire:()=>{noise({ft:'lowpass',f:400,f2:2400,d:.45,v:.35,a:.05});tone({f:220,f2:520,d:.35,v:.12,type:'sawtooth',lp:1200})},
+  thunderShot:()=>{noise({f:3000,q:.6,d:.3,v:.3});tone({f:1600,f2:300,d:.25,v:.12,type:'square',lp:3500})},
+  thunder:()=>{noise({f:4000,q:.5,d:.08,v:.5});noise({ft:'lowpass',f:900,f2:120,d:1.8,v:.6,a:.02,at:.03,rv:.6});tone({f:60,f2:35,d:1.5,v:.45,at:.05})},
+  bow:()=>{tone({f:330,f2:180,d:.12,v:.25,type:'triangle'});noise({f:2600,f2:900,q:2,d:.2,v:.18})},
+  throw:()=>noise({f:600,f2:1500,q:1.2,d:.2,v:.2,a:.02}),
+  boom:()=>{noise({ft:'lowpass',f:1200,f2:80,d:1.2,v:.7,rv:.5});tone({f:90,f2:30,d:.9,v:.6})},
+  eat:()=>{for(let i=0;i<3;i++)noise({f:1400+Math.random()*800,q:2,d:.06,v:.25,at:i*.13})},
+  jump:()=>noise({f:500,f2:1100,q:1,d:.16,v:.08,a:.02}),
+  skill:()=>{[0,7,12].forEach((s,i)=>tone({f:hz(76+s),d:.6,v:.1,at:i*.05,rv:.6}));noise({f:2000,f2:5000,q:1,d:.4,v:.1,a:.1})},
+  chest:()=>{tone({f:260,f2:180,d:.25,v:.25,type:'triangle'});[0,4,7,12,16].forEach((s,i)=>pluck(76+s,.2+i*.06,.13,null,1.4))},
+  gong:()=>{[1,1.48,2.02,2.74,3.6].forEach((r,i)=>tone({f:98*r,d:4-i*.5,v:.22/(i+1),a:.01,rv:.9}));noise({ft:'lowpass',f:600,d:.5,v:.3})},
+  kill:()=>{tone({f:hz(81),d:.5,v:.08,rv:.4})},
+  bowl:()=>{tone({f:hz(62),d:3.5,v:.18,a:.02,rv:.9});tone({f:hz(62)*2.71,d:2.5,v:.05,a:.02,rv:.9})},
+  click:()=>tone({f:1500,d:.04,v:.06,type:'triangle'}),
+  build:()=>{for(let i=0;i<3;i++){tone({f:180,f2:120,d:.1,v:.4,at:i*.18,type:'triangle'});noise({f:900,q:2,d:.06,v:.3,at:i*.18})}}};
+const SFX_VOL={swing:8,hit:4.5,flesh:5,chop:6.5,mine:7,pickup:2,craft:1.3,hurt:5.5,fire:6.5,thunderShot:6.5,bow:7,throw:12,eat:4.5,jump:10,kill:7,click:7,skill:2.5};
+function sfx(k,arg){if(!AUD.ctx||!AUD.on.sfx||!SFX[k])return;const now=performance.now();if(now-(AUD.last[k]||0)<45)return;AUD.last[k]=now;
+  const g=AUD.ctx.createGain();g.gain.value=SFX_VOL[k]||1;g.connect(AUD.sfxG);AUD.cur=g;try{SFX[k](arg)}catch(e){}AUD.cur=null;setTimeout(()=>{try{g.disconnect()}catch(e){}},6000)}
+
+/* 背景音乐：D 宫五声音阶，随机游走的旋律 + 低音铺底 + 战斗时的鼓 */
+function musStart(){if(AUD.mus||!AUD.ctx)return;const c=AUD.ctx;const M=AUD.mus={next:c.currentTime+.5,deg:7,drum:0,pad:null,padT:0};
+  setInterval(musTick,120)}
+function musMood(){let night=false,fight=false;try{if(typeof G!=='undefined'){const h=G.hour||12;night=h<5.5||h>19;if(G.started&&!G.dead&&typeof ACT!=='undefined'&&typeof P!=='undefined')for(const a of ACT){if(!a.dead&&a.angry&&(a.human||a.boss||a.kind==='wolf'||a.ghost||a.xinmo)&&Math.hypot(a.x-P.x,a.z-P.z)<26){fight=true;break}}}}catch(e){}return{night,fight}}
+function musTick(){const c=AUD.ctx,M=AUD.mus;if(!c||c.state!=='running'||!AUD.on.mus)return;const mood=musMood(),base=mood.night?50:62,out=AUD.musG;
+  // 低音铺底：每 8 秒换一次（宫音或徵音）
+  if(c.currentTime>M.padT-.2){const root=base-12+(Math.random()<.35?7:0),t=M.padT=Math.max(c.currentTime,M.padT)+8;
+    for(const [m,dt] of [[root,0],[root+7,8]]){const os=c.createOscillator(),g=c.createGain(),f=c.createBiquadFilter();os.type='sawtooth';os.frequency.value=hz(m);os.detune.value=dt;f.type='lowpass';f.frequency.value=mood.night?380:520;
+      const s=t-8;g.gain.setValueAtTime(.0001,s);g.gain.exponentialRampToValueAtTime(.05,s+2.5);g.gain.setValueAtTime(.05,t-2);g.gain.exponentialRampToValueAtTime(.0001,t+.5);os.connect(f);f.connect(g);g.connect(out);const r=c.createGain();r.gain.value=.6;g.connect(r);r.connect(AUD.rev);os.start(s);os.stop(t+.6)}}
+  // 旋律：拨弦，夜里更稀疏
+  if(M.next<c.currentTime-.5)M.next=c.currentTime+.05;
+  while(M.next<c.currentTime+.3){const step=mood.fight?.25:mood.night?.75:.5;
+    if(Math.random()<(mood.fight?.55:mood.night?.4:.55)){M.deg=clamp(M.deg+[-2,-1,-1,1,1,2,0][Math.floor(Math.random()*7)],0,11);const oct=Math.floor(M.deg/5),m=base+oct*12+PENTA[M.deg%5];
+      pluck(m,M.next-c.currentTime,mood.night?.1:.13,out,mood.night?2.2:1.5);if(Math.random()<.12)pluck(m+12,M.next-c.currentTime+.06,.06,out,1.2)}
+    if(mood.fight){const beat=M.drum++%8;if(beat===0||beat===3||beat===4||beat===6){const at=M.next-c.currentTime;tone({f:110,f2:45,d:.35,v:beat===0?.5:.3,at,out});noise({ft:'lowpass',f:400,d:.12,v:.2,at,out})}}else M.drum=0;
+    M.next+=step*(Math.random()<.15?2:1)}}
+
+/* 设置里的开关 + 按钮点击音 */
+(function(){const sb=document.getElementById('sndBtn'),mb=document.getElementById('musBtn');
+  const draw=()=>{if(sb)sb.textContent='音效：'+(AUD.on.sfx?'开':'关');if(mb)mb.textContent='音乐：'+(AUD.on.mus?'开':'关')};draw();
+  if(sb)sb.onclick=()=>{audInit();audSet('sfx',!AUD.on.sfx);draw();sfx('click')};
+  if(mb)mb.onclick=()=>{audInit();audSet('mus',!AUD.on.mus);draw()};
+  document.addEventListener('click',e=>{const b=e.target&&e.target.closest&&e.target.closest('button');if(b&&!b.classList.contains('ab'))sfx('click')},true)})();
+
 
 /* =====================================================================
    二、世界：植被（实例化，可砍伐）、石头、草药、浆果、地上物资、建筑、动态细节
@@ -439,7 +525,7 @@ for(const type in TREE_TYPES){const T_=TREE_TYPES[type],list=trees.filter(t=>t.t
   scene.add(a,b);treeIM[type]={a,b}}
 function setTree(t,vis){const I=treeIM[t.type];I.a.setMatrixAt(t.i,vis?t.m:ZERO);I.b.setMatrixAt(t.i,vis?t.m:ZERO);I.a.instanceMatrix.needsUpdate=I.b.instanceMatrix.needsUpdate=true;t.col.off=!vis}
 const falling=[];
-function fellTree(t,dirX,dirZ){setTree(t,false);t.alive=false;t.t=0;const T_=TREE_TYPES[t.type];
+function fellTree(t,dirX,dirZ){sfx('treefall');setTree(t,false);t.alive=false;t.t=0;const T_=TREE_TYPES[t.type];
   const g=new THREE.Group(),a=new THREE.Mesh(T_.trunk,T_.tm),b=new THREE.Mesh(T_.crown,T_.cm);a.castShadow=b.castShadow=true;g.add(a,b);
   g.position.set(t.x,H(t.x,t.z)-.15,t.z);g.scale.setScalar(t.s);scene.add(g);const ax=new THREE.Vector3(dirZ,0,-dirX).normalize();falling.push({g,ax,t:0})}
 
@@ -997,7 +1083,7 @@ const ACT=[],PROJ=[],LATER=[],RESP=[];
 const later=(t,fn)=>LATER.push({t,fn});
 const has=(c)=>Object.entries(c).every(([k,v])=>(G.inv[k]||0)>=v);
 const take=(c)=>{for(const k in c)G.inv[k]=(G.inv[k]||0)-c[k]};
-const give=(c)=>{for(const k in c)G.inv[k]=(G.inv[k]||0)+c[k]};
+const give=(c)=>{for(const k in c)G.inv[k]=(G.inv[k]||0)+c[k];sfx('pickup')};
 const fmtCost=(c)=>Object.entries(c).map(([k,v])=>ITEM[k]+v).join(' ');
 const ui={toast:()=>{},refresh:()=>{},trade:()=>{},end:()=>{},death:()=>{},bossBar:()=>{}};
 function toast(t,long){ui.toast(t,long)}
@@ -1061,10 +1147,10 @@ const dist2=(o)=>(o.x-P.x)**2+(o.z-P.z)**2;
 function tryBuild(id){const r=RECIPES.find(r=>r.id===id);const fx=Math.sin(P.yaw),fz=Math.cos(P.yaw);let x=P.x+fx*2.6,z=P.z+fz*2.6;
   if(id==='boat'){const Z=ZONES.river;if(Math.hypot(P.x-Z.x,P.z-Z.z)>Z.r+6){toast('灵舟只能在「灵河渡口」建造（地图上的⚓）');return false}x=riverX(Z.z)-8;z=Z.z+3.6;if(G.builds.some(b=>b.t==='boat')){toast('已经造好灵舟了');return false}}
   else{if(WATER_Y-groundAt(x,z)>-.2){toast('这里是水里，换个地方');return false}for(const c of nearCols(x,z))if(!c.off&&Math.hypot(c.x-x,c.z-z)<c.r+1.2){toast('前面有东西挡着，换个空地');return false}}
-  take(r.cost);placeBuild(id,x,z,P.yaw+Math.PI);play(P.model,'gather',.6);burst(x,groundAt(x,z)+.5,z,MAT.wood,10);toast('建好了：'+r.n);G.flags['b_'+id]=1;gainXP(10);return true}
+  take(r.cost);sfx('build');placeBuild(id,x,z,P.yaw+Math.PI);play(P.model,'gather',.6);burst(x,groundAt(x,z)+.5,z,MAT.wood,10);toast('建好了：'+r.n);G.flags['b_'+id]=1;gainXP(10);return true}
 function craft(id){const r=RECIPES.find(r=>r.id===id);if(!r||!has(r.cost))return false;
   if(r.k==='build')return tryBuild(id);
-  take(r.cost);if(r.fn)r.fn();else if(r.give)give(r.give);else{G.tools[id]=true;if(WEAPONS[id])equip(id);if(id==='canteen')G.water=0;if(id==='glider')toast('有了滑翔伞：跳起来后在空中按住「跳」就能滑翔');if(id==='thunder')toast('火符升级为雷符！')}
+  sfx('craft');take(r.cost);if(r.fn)r.fn();else if(r.give)give(r.give);else{G.tools[id]=true;if(WEAPONS[id])equip(id);if(id==='canteen')G.water=0;if(id==='glider')toast('有了滑翔伞：跳起来后在空中按住「跳」就能滑翔');if(id==='thunder')toast('火符升级为雷符！')}
   G.flags['c_'+id]=1;toast('做好了：'+r.n);gainXP(3);return true}
 function equip(w){if(w!=='fist'&&!G.tools[w])return;G.weapon=w;if(P.model.rig)setProp(P.model,WEAPONS[w].prop);else if(P.model.glb)attachGLBProp(WEAPONS[w].prop);ui.refresh()}
 function nextWeapon(){const own=WORDER.filter(w=>w==='fist'||G.tools[w]);const i=own.indexOf(G.weapon);equip(own[(i+1)%own.length]);toast('换成：'+WEAPONS[G.weapon].n)}
@@ -1091,15 +1177,15 @@ function populate(){
 
 /* ---------- 伤害 ---------- */
 function hurtPlayer(d,fx,fz){if(G.dead||G.over||P.inv>0)return;P.inv=.35;G.med=false;if(P.st==='sit'||P.sitFire){P.sitFire=null;G.timeScale=1}if(G.perks&&G.perks.xuanjia)d*=.85;if(G.realm>=3)d*=.9;
-  G.hp-=d;ftxt(P.x,P.y+1.9,P.z,'-'+Math.round(d),'hurt');burst(P.x,P.y+1.1,P.z,bloodMat,4,2);const dx=P.x-fx,dz=P.z-fz,l=Math.hypot(dx,dz)||1;P.kx=dx/l*7;P.kz=dz/l*7;
+  G.hp-=d;sfx('hurt');ftxt(P.x,P.y+1.9,P.z,'-'+Math.round(d),'hurt');burst(P.x,P.y+1.1,P.z,bloodMat,4,2);const dx=P.x-fx,dz=P.z-fz,l=Math.hypot(dx,dz)||1;P.kx=dx/l*7;P.kz=dz/l*7;
   if(P.model)play(P.model,'hurt',.3);$('#hurt').classList.remove('on');void $('#hurt').offsetWidth;$('#hurt').classList.add('on');if(navigator.vibrate)try{navigator.vibrate(40)}catch(e){}
   if(G.hp<=0){if(G.trib){tribFail();return}G.hp=0;die()}}
-function die(){G.flying=false;G.med=false;G.dead=true;P.st='dead';later(1.6,()=>ui.death())}
-function hurtActor(a,d,fx,fz,kb=5,stun=0){if(a.dead)return;a.hp-=d;a.hitT=4;a.pop=.15;ftxt(a.x,a.y+a.h,a.z,Math.round(d),d>=30?'crit':'');
+function die(){sfx('death');G.flying=false;G.med=false;G.dead=true;P.st='dead';later(1.6,()=>ui.death())}
+function hurtActor(a,d,fx,fz,kb=5,stun=0){if(a.dead)return;a.hp-=d;sfx(a.beast?'flesh':'hit',d>=30);a.hitT=4;a.pop=.15;ftxt(a.x,a.y+a.h,a.z,Math.round(d),d>=30?'crit':'');
   burst(a.x,a.y+a.h*.6,a.z,a.beast?bloodMat:hitMat,5,2.4);const dx=a.x-fx,dz=a.z-fz,l=Math.hypot(dx,dz)||1;const kk=a.boss?kb*.25:kb;a.kx=dx/l*kk;a.kz=dz/l*kk;a.stun=Math.max(a.stun||0,stun);
   a.angry=true;if(a.human)play(a.obj,'hurt',.3);else a.obj.act={k:'hurt',t:0,d:.3};if(a.def&&a.def.flee){a.wound=true;a.tired=Math.max(a.tired||0,1.2)}
   if(a.hp<=0){a.hp=0;a.dead=true;a.deadT=0;gainXP(Math.round((a.boss?300:a.xinmo?150:a.guard2?120:a.human?30:({rabbit:5,deer:10,boar:20,wolf:25,ghost:18}[a.kind]||10))*DIFF));if(!a.human)gainQi(a.guard2?30:4);if(a.human){a.obj.act=null}
-    if(a.boss){G.bossDead=true;ui.bossBar(null);bossDefeated(a)}
+    sfx(a.boss?'gong':'kill');if(a.boss){G.bossDead=true;ui.bossBar(null);bossDefeated(a)}
     else if(a.xinmo){tribSuccess()}
     else if(a.ghost){gainQi(8);const l={};if(Math.random()<.45)l.ling=1;if(Math.random()<.25)l.herb=1;if(Object.keys(l).length)give(l);toast('游魂消散'+(Object.keys(l).length?'：'+fmtCost(l):'')+'，灵气 +8')}
     else if(a.human){const l={ling:1+(Math.random()<.5?1:0)};if(Math.random()<.3)l.potion=1;if(G.faction==='B'&&Math.random()<.4)l.arrow=3;give(l);toast('击败'+a.name+'：'+fmtCost(l));RESP.push({t:300,fn:()=>!G.bossDead&&spawnSoldier(...(randAround(ZONES.enemy.x,ZONES.enemy.z,4,20)||[ZONES.enemy.x,ZONES.enemy.z]))})}
@@ -1113,31 +1199,31 @@ function frontTree(){let best=null,bd=1e9;const fx=Math.sin(P.yaw),fz=Math.cos(P
 function frontRock(){let best=null,bd=1e9;for(const n of nodes){if(n.kind!=='rock'||!n.alive)continue;const d=Math.hypot(n.x-P.x,n.z-P.z);if(d<n.s*1.1+1.4&&d<bd){bd=d;best=n}}return best}
 function busy(){return G.dead||G.over||G.paused||P.st==='sleep'||P.lock>0}
 function attack(){if(busy()||P.atkCd>0)return;if(P.sitFire){P.sitFire=null;G.timeScale=1}const w=WEAPONS[G.weapon];
-  let foe=nearestFoe(w.range+1.8,null);if(foe&&P.st!=='swim'){P.yaw=Math.atan2(foe.x-P.x,foe.z-P.z);P.atkCd=w.cd;P.sta=Math.max(0,G.sta-=4);play(P.model,'swing',w.cd*.95);later(.17,()=>{const n=meleeHit(w.range,w.dmg*G.atkMul,1.1,G.weapon==='spear'?7:5);if(n)shake(.12)});return}
+  let foe=nearestFoe(w.range+1.8,null);if(foe&&P.st!=='swim'){P.yaw=Math.atan2(foe.x-P.x,foe.z-P.z);P.atkCd=w.cd;P.sta=Math.max(0,G.sta-=4);play(P.model,'swing',w.cd*.95);sfx('swing');later(.17,()=>{const n=meleeHit(w.range,w.dmg*G.atkMul,1.1,G.weapon==='spear'?7:5);if(n)shake(.12)});return}
   const t=frontTree();if(t){let ww=G.weapon;if(!WEAPONS[ww].chop||WEAPONS[ww].chop<1.5){const b=['axe','shovel'].find(k=>G.tools[k]);if(b){equip(b);ww=b}}
-    P.yaw=Math.atan2(t.x-P.x,t.z-P.z);P.atkCd=.62;play(P.model,'chop',.6);later(.33,()=>{if(!t.alive)return;t.hp-=WEAPONS[ww].chop;burst(t.x-Math.sin(P.yaw)*.3,P.y+1.1,t.z-Math.cos(P.yaw)*.3,MAT.wood,5,2.2);shake(.06);
+    P.yaw=Math.atan2(t.x-P.x,t.z-P.z);P.atkCd=.62;play(P.model,'chop',.6);later(.33,()=>{if(!t.alive)return;t.hp-=WEAPONS[ww].chop;sfx('chop');burst(t.x-Math.sin(P.yaw)*.3,P.y+1.1,t.z-Math.cos(P.yaw)*.3,MAT.wood,5,2.2);shake(.06);
       if(t.hp<=0.01){const dx=t.x-P.x,dz=t.z-P.z,l=Math.hypot(dx,dz)||1;fellTree(t,dx/l,dz/l);toast('树倒了！');
         later(1.5,()=>{const w=TREE_TYPES[t.type].wood;give({wood:w});toast('木头 +'+w);G.flags.chop=(G.flags.chop||0)+1;gainXP(4);
           RESP.push({t:240,fn:function f(){if(dist2(t)<900){RESP.push({t:30,fn:f});return}t.alive=true;t.hp=TREE_TYPES[t.type].hits;setTree(t,true)}})})}});return}
   const r=frontRock();if(r){let ww=G.weapon;if(WEAPONS[ww].mine<2){const b=['pick','shovel'].find(k=>G.tools[k]);if(b){equip(b);ww=b}}
-    P.yaw=Math.atan2(r.x-P.x,r.z-P.z);P.atkCd=.65;play(P.model,'chop',.62);later(.34,()=>{if(!r.alive)return;r.hp-=WEAPONS[ww].mine;burst(r.x,r.y+.6,r.z,MAT.rock2,6,2.6);shake(.06);
+    P.yaw=Math.atan2(r.x-P.x,r.z-P.z);P.atkCd=.65;play(P.model,'chop',.62);later(.34,()=>{if(!r.alive)return;r.hp-=WEAPONS[ww].mine;sfx('mine');burst(r.x,r.y+.6,r.z,MAT.rock2,6,2.6);shake(.06);
       if(r.hp<=0.01){r.alive=false;setNode(r,false);const l={stone:3};if(Math.random()<.35)l.salt=1;const good=WEAPONS[ww].mine>=2;const inMine=zoneOf(r.x,r.z)==='mine';if(good&&Math.random()<(inMine?.55:.18))l.ling=1;give(l);toast('采到：'+fmtCost(l)+(good?'':'（用石镐才挖得出灵石）'));gainXP(5);
         RESP.push({t:260,fn:function f(){if(dist2(r)<700){RESP.push({t:30,fn:f});return}r.alive=true;r.hp=4;setNode(r,true)}})}});return}
-  P.atkCd=w.cd;play(P.model,'swing',w.cd*.95);later(.17,()=>meleeHit(w.range,w.dmg*G.atkMul))}
+  P.atkCd=w.cd;play(P.model,'swing',w.cd*.95);sfx('swing');later(.17,()=>meleeHit(w.range,w.dmg*G.atkMul))}
 function shoot(kind,a,spd,dmg){const fx=Math.sin(P.yaw),fz=Math.cos(P.yaw);let m;
   if(kind==='fire'||kind==='thunder'){m=new THREE.Mesh(new THREE.SphereGeometry(.22,12,8),new THREE.MeshBasicMaterial({color:kind==='fire'?'#ffb040':'#9ad8ff'}));const h=new THREE.Mesh(new THREE.SphereGeometry(.42,12,8),new THREE.MeshBasicMaterial({color:kind==='fire'?'#ff6a20':'#4aa0ff',transparent:true,opacity:.45,blending:THREE.AdditiveBlending,depthWrite:false}));m.add(h)}
   else if(kind==='bolt'){m=new THREE.Mesh(new THREE.CylinderGeometry(.02,.02,.7,5).rotateX(Math.PI/2),MAT.wood)}
   else if(kind==='bomb'){m=new THREE.Mesh(new THREE.SphereGeometry(.2,10,8),MAT.dark)}else{m=new THREE.Mesh(new THREE.DodecahedronGeometry(.12,0),MAT.pebble)}
   let vx=fx*spd,vz=fz*spd,vy=kind==='bomb'?7:kind==='stone'?3:0;let sy=P.y+1.4;
   if(a){const dx=a.x-P.x,dz=a.z-P.z,d=Math.hypot(dx,dz);vx=dx/d*spd;vz=dz/d*spd;if(kind==='bomb'){const t=d/spd;vy=(a.y-sy)/t+9*t}else if(kind!=='stone')vy=(a.y+a.h*.6-sy)/(d/spd);else{const t=d/spd;vy=(a.y+a.h*.6-sy)/t+9*t}}
-  m.position.set(P.x+fx*.6,sy,P.z+fz*.6);scene.add(m);PROJ.push({m,vx,vy,vz,kind,dmg,t:0,g:kind==='bomb'||kind==='stone'?18:0})}
+  sfx(kind==='fire'?'fire':kind==='thunder'?'thunderShot':kind==='bolt'?'bow':'throw');m.position.set(P.x+fx*.6,sy,P.z+fz*.6);scene.add(m);PROJ.push({m,vx,vy,vz,kind,dmg,t:0,g:kind==='bomb'||kind==='stone'?18:0})}
 function skill(){if(busy()||P.atkCd>0)return;if(G.skillSel&&G.skillSel!=='base'){castSkill(G.skillSel);return}const a=nearestFoe(32,.9);if(a)P.yaw=Math.atan2(a.x-P.x,a.z-P.z);
   if(G.faction==='A'){if(G.mana<20){toast('灵力不足（每秒自动恢复）');return}G.mana-=20;const th=G.tools.thunder;play(P.model,'throw',.45);P.atkCd=.5;later(.2,()=>shoot(th?'thunder':'fire',a,24,(th?44:30)*G.atkMul*G.skillMul));return}
   if(G.tools.bow&&(G.inv.arrow||0)>0){G.inv.arrow--;play(P.model,'throw',.35);P.atkCd=.55;later(.12,()=>shoot('bolt',a,42,40*G.atkMul*G.skillMul));return}
   if((G.inv.bomb||0)>0){G.inv.bomb--;play(P.model,'throw',.5);P.atkCd=.8;later(.25,()=>shoot('bomb',a,14,65));return}
   if((G.inv.stone||0)>0){G.inv.stone--;play(P.model,'throw',.45);P.atkCd=.5;later(.2,()=>shoot('stone',a,20,9*G.atkMul));if(!G.tools.bow)toast('扔了块石头（做「弩」后技能键会射弩箭）');return}
   toast(G.tools.bow?'没有弩箭了，去制造':'没有可扔的东西')}
-function explode(x,y,z,r,dmg){burst(x,y+.3,z,MAT.flame2,14,6);burst(x,y+.3,z,MAT.dark,8,5);shake(.35);for(const a of ACT){if(a.dead)continue;const d=Math.hypot(a.x-x,a.z-z);if(d<r)hurtActor(a,dmg*(1-d/r*.5),x,z,9)}if(Math.hypot(P.x-x,P.z-z)<r*.6)hurtPlayer(15,x,z)}
+function explode(x,y,z,r,dmg){sfx('boom');burst(x,y+.3,z,MAT.flame2,14,6);burst(x,y+.3,z,MAT.dark,8,5);shake(.35);for(const a of ACT){if(a.dead)continue;const d=Math.hypot(a.x-x,a.z-z);if(d<r)hurtActor(a,dmg*(1-d/r*.5),x,z,9)}if(Math.hypot(P.x-x,P.z-z)<r*.6)hurtPlayer(15,x,z)}
 function updProj(dt){for(let i=PROJ.length-1;i>=0;i--){const p=PROJ[i];p.t+=dt;p.vy-=p.g*dt;p.m.position.x+=p.vx*dt;p.m.position.y+=p.vy*dt;p.m.position.z+=p.vz*dt;const q=p.m.position;
   if(p.kind==='bolt')p.m.lookAt(q.x+p.vx,q.y+p.vy,q.z+p.vz);if(p.kind==='fire'||p.kind==='thunder'){p.m.children[0].scale.setScalar(1+Math.sin(p.t*30)*.2);if(Math.random()<.4)burst(q.x,q.y,q.z,p.kind==='fire'?MAT.flame2:hitMat,1,.6)}
   let done=p.t>3||q.y<groundAt(q.x,q.z);
@@ -1146,10 +1232,10 @@ function updProj(dt){for(let i=PROJ.length-1;i>=0;i--){const p=PROJ[i];p.t+=dt;p
 let shakeK=0;const shake=k=>shakeK=Math.max(shakeK,k);
 
 function eat(){if(busy())return;
-  if(G.hp<G.maxhp*.5&&(G.inv.potion||0)>0){G.inv.potion--;G.hp=Math.min(G.maxhp,G.hp+50);play(P.model,'eat',.8);toast('服下疗伤药 生命+50');ftxt(P.x,P.y+2,P.z,'+50','heal');return}
+  if(G.hp<G.maxhp*.5&&(G.inv.potion||0)>0){G.inv.potion--;G.hp=Math.min(G.maxhp,G.hp+50);play(P.model,'eat',.8);sfx('eat');toast('服下疗伤药 生命+50');ftxt(P.x,P.y+2,P.z,'+50','heal');return}
   const foods=[['cooked',38,6,'烤肉'],['grain',26,3,'灵谷'],['berry',9,1,'浆果'],['meat',12,-6,'生肉（会闹肚子）']];
   if(G.hunger>96){toast('还不饿');return}
-  for(const [k,h,hp,n] of foods)if((G.inv[k]||0)>0){G.inv[k]--;G.hunger=Math.min(100,G.hunger+h);G.hp=clamp(G.hp+hp,1,G.maxhp);play(P.model,'eat',.8);toast('吃了'+n+' 饱食+'+h);return}
+  for(const [k,h,hp,n] of foods)if((G.inv[k]||0)>0){G.inv[k]--;G.hunger=Math.min(100,G.hunger+h);G.hp=clamp(G.hp+hp,1,G.maxhp);play(P.model,'eat',.8);sfx('eat');toast('吃了'+n+' 饱食+'+h);return}
   if((G.inv.potion||0)>0&&G.hp<G.maxhp){G.inv.potion--;G.hp=Math.min(G.maxhp,G.hp+50);toast('服下疗伤药 生命+50');return}
   toast('没有吃的：摘浆果、打猎烤肉，或者种灵谷')}
 
@@ -1201,7 +1287,7 @@ function updPlayer(dt){const h=P.model;P.atkCd-=dt;P.inv-=dt;P.lock-=dt;
   const gy=groundAt(P.x,P.z);
   if(swim&&P.y<WATER_Y+.3){P.y=lerp(P.y,WATER_Y-.45,Math.min(1,dt*6));P.vy=0;P.ground=false;P.st='swim';if(IN.jump&&depth<2){P.vy=6.5;P.y=WATER_Y+.32;P.st='air'}}
   else{
-    if(IN.jump&&P.ground&&G.sta>6&&P.lock<=0&&!G.flying){P.vy=8.6;P.ground=false;G.sta-=6;P.dj=0}else if(IN.jump&&!P.ground&&G.realm>=1&&!P.dj&&G.sta>8&&!G.flying){P.vy=8.2;P.dj=1;G.sta-=8;burst(P.x,P.y,P.z,hitMat,6,2)}
+    if(IN.jump&&P.ground&&G.sta>6&&P.lock<=0&&!G.flying){sfx('jump');P.vy=8.6;P.ground=false;G.sta-=6;P.dj=0}else if(IN.jump&&!P.ground&&G.realm>=1&&!P.dj&&G.sta>8&&!G.flying){P.vy=8.2;P.dj=1;G.sta-=8;burst(P.x,P.y,P.z,hitMat,6,2)}
     const upd=inUpdraft();const gliding=!G.flying&&!P.ground&&IN.jumpHeld&&(G.tools.glider||G.realm>=1)&&(P.vy<-.5||(upd&&P.st==='glide'))&&G.sta>0&&P.y-gy>1.2;
     if(G.flying){P.vy=IN.jumpHeld?6:-1.3}else{P.vy-=(gliding?6:22)*dt;if(gliding){P.vy=upd?Math.min(P.vy+22*dt,7.5):Math.max(P.vy,-1.9);G.sta-=(upd?0:2.5)*dt}}
     P.y+=P.vy*dt;if(P.y<=gy){P.y=gy;P.vy=0;P.ground=true}else if(P.y-gy>.25||P.vy>0)P.ground=false;
@@ -1274,7 +1360,7 @@ function breakthrough(){const A=G.faction==='A';if(G.realm){toast(A?'你已是�
   take(need);G.realm=1;applyOrigin();G.hp=G.maxhp;G.sta=G.maxsta;G.mana=G.maxmana;G.flags.realm=1;P.lock=1.4;P.st='kneel';const fu=CH2OBJ.furnace;burst(fu.x,fu.obj.position.y+2,fu.z,MAT.flame,16,3);burst(P.x,P.y+1,P.z,hitMat,14,3);shake(.2);
   toast(A?'突破成功！炼气 → 筑基：生命 +30、体力 +20、灵力 +40、攻击 +20%':'改造完成！生命 +30、体力 +20、攻击 +20%',1);save()}
 function openChest_old(){const c=CH2OBJ.chest;if(ACT.some(a=>a.guard2&&!a.dead)){toast('守山灵兽还在，先打败它们');return}
-  G.flags.chest=1;c.lid.rotation.x=-1.9;c.glow.visible=false;G.tools.xian=true;WEAPONS.xian.n=G.faction==='A'?'仙剑·流云':'合金战刀';give({ling:6,herb:5,potion:2});equip('xian');burst(c.x,c.obj.position.y+1,c.z,MAT.crystal,18,3);
+  G.flags.chest=1;sfx('chest');c.lid.rotation.x=-1.9;c.glow.visible=false;G.tools.xian=true;WEAPONS.xian.n=G.faction==='A'?'仙剑·流云':'合金战刀';give({ling:6,herb:5,potion:2});equip('xian');burst(c.x,c.obj.position.y+1,c.z,MAT.crystal,18,3);
   toast('获得秘境神兵「'+WEAPONS.xian.n+'」（伤害 48），以及 灵石6 灵草5 疗伤药2',1);save()}
 function startChapter2(){travel(ROUTE()[1]);return;const s={v:1,ch:2,faction:G.faction,origin:G.origin,inv:G.inv,tools:G.tools,hp:G.maxhp,hunger:Math.max(70,G.hunger),sta:G.maxsta,mana:G.maxmana,hour:9,day:G.day+1,weapon:G.weapon,water:G.water,flags:{},bossDead:false,x:null,z:null,builds:[],realm:0,lv:G.lv,xp:G.xp,pts:G.pts,st:G.st};
   try{writeSave(s);sessionStorage.setItem('td5_auto','1')}catch(e){}location.reload()}
@@ -1283,7 +1369,7 @@ function startChapter2(){travel(ROUTE()[1]);return;const s={v:1,ch:2,faction:G.f
 function quest(){return CH===2?quest2():questFull()}   // 第一章任务链见 p7_guide.js（新手引导 + 主线）
 
 function openChest(){const c=CH2OBJ.chest;if(ACT.some(a=>a.guard2&&!a.dead)){toast('守山灵兽还在，先打败它们');return}
-  G.flags.chest=1;c.lid.rotation.x=-1.9;c.glow.visible=false;const l={ling:5,herb:4,potion:1,fu:2};if(REGD.mat)l[regMat(REGK)]=4;give(l);gainQi(60);burst(c.x,c.obj.position.y+1,c.z,MAT.crystal,18,3);
+  G.flags.chest=1;sfx('chest');c.lid.rotation.x=-1.9;c.glow.visible=false;const l={ling:5,herb:4,potion:1,fu:2};if(REGD.mat)l[regMat(REGK)]=4;give(l);gainQi(60);burst(c.x,c.obj.position.y+1,c.z,MAT.crystal,18,3);
   let msg='秘境宝箱：'+fmtCost(l)+'，灵气 +60';if(!G.tools.xian){G.tools.xian=true;WEAPONS.xian.n=G.faction==='A'?'仙剑·流云':'合金战刀';equip('xian');msg+='，以及秘境神兵「'+WEAPONS.xian.n+'」'}toast(msg,1);save()}
 function quest2(){const f=G.flags,A=G.faction==='A';const steps=[
     [()=>f.merchant,'去「'+ZONES.market.name+'」找商人打听'+REGD.n+'的消息'],
@@ -1313,7 +1399,7 @@ function applyOrigin(){const o=G.origin,RB=REALMS[G.realm||0];G.maxhp=(o==='天'
 const needXP=l=>40+l*35;
 function rankName(){return realmN(G.realm||0)+' · '+G.lv+' 级'}
 function gainXP(n){if(G.over||!G.started)return;G.xp+=n;ftxt(P.x,P.y+2.3,P.z,'+'+n+' 经验','xp');let up=0;while(G.lv<50&&G.xp>=needXP(G.lv)){G.xp-=needXP(G.lv);G.lv++;G.pts+=2;up++}
-  if(up){const r=G.hp/G.maxhp;applyOrigin();G.hp=G.maxhp;G.sta=G.maxsta;if(G.maxmana)G.mana=G.maxmana;burst(P.x,P.y+1,P.z,MAT.gold,18,3);ftxt(P.x,P.y+2.8,P.z,'升级！','lvup');
+  if(up){sfx('levelup');const r=G.hp/G.maxhp;applyOrigin();G.hp=G.maxhp;G.sta=G.maxsta;if(G.maxmana)G.mana=G.maxmana;burst(P.x,P.y+1,P.z,MAT.gold,18,3);ftxt(P.x,P.y+2.8,P.z,'升级！','lvup');
     toast('升级了！'+rankName()+'：生命体力回满，获得 '+(2*up)+' 个属性点（点左上角「加点」）',1);save()}}
 async function startGame(fac,origin,sv){G.starting=true;try{await grokPreload()}catch(e){}
   G.faction=fac;G.origin=origin;G.realm=sv&&sv.realm||0;G.lv=sv&&sv.lv||1;G.xp=sv&&sv.xp||0;G.pts=sv&&sv.pts||0;G.st=Object.assign({str:0,vit:0,agi:0,spi:0},sv&&sv.st||{});Object.assign(G,{qi:sv&&sv.qi||0,wtier:sv&&sv.wtier||0,cleared:sv&&sv.cleared||{},bases:sv&&sv.bases||{},rflags:sv&&sv.rflags||{},perks:sv&&sv.perks||{},skillSel:sv&&sv.skillSel||'base'});applyOrigin();G.hp=G.maxhp;G.sta=G.maxsta;G.mana=G.maxmana;G.inv={};G.tools={};
@@ -1392,19 +1478,19 @@ const SKILLS={
 const PASSIVES=[[1,'御风：空中可再跳一次，没有滑翔伞也能滑翔'],[1,'神识 / 扫描：20 秒内地图显示附近宝箱、灵脉、野兽'],[2,'灵植催生：种植田生长 ×3，灵兽干活 ×1.5'],[2,'御剑飞行：自由飞行，按住「跳」上升'],[3,'元婴护体：受到伤害 -10%'],[4,'化神：灵气自动缓慢增长']];
 function cycleSkill(){const ks=Object.keys(SKILLS).filter(k=>G.realm>=SKILLS[k].realm);const i=ks.indexOf(G.skillSel);G.skillSel=ks[(i+1)%ks.length];toast('技能键：'+SKILLS[G.skillSel].n()+(ks.length<2?'（筑基后会解锁更多修仙技能）':''))}
 function castSkill(k){const S=SKILLS[k];if(k==='fly'&&G.flying){G.flying=false;toast('收起飞行');return}
-  if(S.cost&&G.mana<S.cost){toast((G.faction==='A'?'灵力':'能量')+'不足（需要 '+S.cost+'）');return}if(S.cost)G.mana-=S.cost;P.atkCd=.4;
+  if(S.cost&&G.mana<S.cost){toast((G.faction==='A'?'灵力':'能量')+'不足（需要 '+S.cost+'）');return}if(S.cost)G.mana-=S.cost;P.atkCd=.4;if(k!=='tian')sfx('skill');
   if(k==='shen'){G.revealT=20;const n=PCHESTS.filter(c=>!c.open&&Math.hypot(c.x-P.x,c.z-P.z)<200).length;burst(P.x,P.y+1.6,P.z,MAT.crystal,12,3);toast('神识展开：附近还有 '+n+' 个未开的宝箱（看地图）')}
   if(k==='fly'){G.flying=true;P.vy=3;P.ground=false;toast((G.faction==='A'?'御剑飞行':'喷射飞行')+'：按住「跳」上升，松开慢慢下降，再按技能键落地')}
   if(k==='tian'){let n=0;for(const a of ACT){if(a.dead||Math.hypot(a.x-P.x,a.z-P.z)>15)continue;lightning(a.x,a.z);hurtActor(a,60*G.skillMul,P.x,P.z,3,.8);n++}play(P.model,'throw',.5);if(!n)lightning(P.x+Math.sin(P.yaw)*6,P.z+Math.cos(P.yaw)*6);shake(.3)}
   if(k==='clone'){spawnAlly();toast('分身出现，协助你战斗 30 秒')}
   if(k==='slow'){G.slowT=8;burst(P.x,P.y+1,P.z,MAT.crystal,20,6);toast('领域展开：周围敌人变慢 8 秒')}
   if(k==='blink'){const fx=Math.sin(P.yaw),fz=Math.cos(P.yaw);let x=P.x,z=P.z;for(let i=0;i<24;i++){const [nx,nz]=collide(x+fx*.5,z+fz*.5,.35);x=nx;z=nz}burst(P.x,P.y+1,P.z,hitMat,8,2);P.x=x;P.z=z;P.y=Math.max(P.y,groundAt(x,z));burst(x,P.y+1,z,hitMat,8,2)}}
-function lightning(x,z){const y=groundAt(x,z);const m=new THREE.Mesh(new THREE.BoxGeometry(.25,60,.25).translate(0,30,0),new THREE.MeshBasicMaterial({color:'#cfe8ff',transparent:true,opacity:.95,blending:THREE.AdditiveBlending,depthWrite:false}));m.position.set(x,y,z);scene.add(m);
+function lightning(x,z){sfx('thunder');const y=groundAt(x,z);const m=new THREE.Mesh(new THREE.BoxGeometry(.25,60,.25).translate(0,30,0),new THREE.MeshBasicMaterial({color:'#cfe8ff',transparent:true,opacity:.95,blending:THREE.AdditiveBlending,depthWrite:false}));m.position.set(x,y,z);scene.add(m);
   burst(x,y+.4,z,hitMat,10,4);let t=0;FX_RINGS.push({upd:dt=>{t+=dt;m.material.opacity=.95*(1-t/.3);m.scale.x=m.scale.z=1+Math.sin(t*60)*.5;if(t>=.3){scene.remove(m);return true}}})}
 
 /* ---------- 修炼：打坐吸收灵气（灵脉旁 ×5） ---------- */
 function nearLingmai(){return LINGMAI.find(l=>Math.hypot(l.x-P.x,l.z-P.z)<4.5)}
-function startMeditate(){if(G.dead||G.over||busy())return;if(G.med){G.med=false;G.timeScale=1;return}if(G.flying||!P.ground){toast('落地后才能打坐');return}
+function startMeditate(){if(G.dead||G.over||busy())return;if(G.med){G.med=false;G.timeScale=1;return}if(G.flying||!P.ground){toast('落地后才能打坐');return}sfx('bowl');
   if(ACT.some(a=>!a.dead&&(a.angry||a.human)&&!a.def?.flee&&Math.hypot(a.x-P.x,a.z-P.z)<14)){toast('附近有敌人，静不下心');return}
   P.sitFire=null;G.med=true;G.timeScale=3;toast(nearLingmai()?'在灵脉旁打坐：灵气吸收 ×5':(G.faction==='A'?'打坐修炼：慢慢吸收天地灵气（去发光的灵脉旁会快 5 倍）':'充能冥想：吸收环境能量（去发光的灵脉旁会快 5 倍）'))}
 const aura=new THREE.Mesh(new THREE.TorusGeometry(1,.05,6,32),new THREE.MeshBasicMaterial({color:'#9af0ff',transparent:true,opacity:.7,blending:THREE.AdditiveBlending,depthWrite:false}));aura.rotation.x=Math.PI/2;aura.visible=false;scene.add(aura);
@@ -1424,7 +1510,7 @@ function updTrib(dt){const T=G.trib;if(!T)return;
 function spawnHeart(){const o=makeHuman('xinmo');setProp(o,G.faction==='A'?'sword':'shovel');const p=randAround(P.x,P.z,5,8)||[P.x+5,P.z];const r=G.trib.r;
   const a=addActor({kind:'xinmo',human:true,xinmo:true,name:'心魔',obj:o,x:p[0],z:p[1],hp:Math.round((320+260*r)*DIFF),dmg:(12+7*r)*DIFF,speed:5.2,r:.45,h:2,home:{x:P.x,z:P.z},aggro:80,angry:true,raid:1,stalk:0});
   toast('心魔现身：「你真的有资格更进一步吗？」打败它！',1)}
-function tribSuccess(){const was=G.realm;G.realm++;G.trib=null;applyOrigin();G.hp=G.maxhp;G.sta=G.maxsta;G.mana=G.maxmana;G.qi=Math.max(0,G.qi-REALMS[G.realm].qi);
+function tribSuccess(){sfx('levelup');const was=G.realm;G.realm++;G.trib=null;applyOrigin();G.hp=G.maxhp;G.sta=G.maxsta;G.mana=G.maxmana;G.qi=Math.max(0,G.qi-REALMS[G.realm].qi);
   burst(P.x,P.y+1,P.z,MAT.gold,30,5);burst(P.x,P.y+1,P.z,MAT.crystal,20,4);ftxt(P.x,P.y+3,P.z,'突破！','lvup');
   const ns=Object.keys(SKILLS).filter(k=>SKILLS[k].realm===G.realm).map(k=>SKILLS[k].n()).join('、');
   toast((G.faction==='A'?'渡劫成功！':'过载突破成功！')+realmN(was)+' → '+realmN(G.realm)+'：生命、灵力、攻击大幅提升'+(ns?'；新技能：'+ns+'（按「换」切换技能）':''),1);gainXP(100);save()}
@@ -1668,7 +1754,7 @@ function guideTick(){const q=CH===2?quest2():questFull();
   if(!GUIDE.init){GUIDE.init=true;if(CH!==2){const st=questSteps();for(let k=0;k<q.n-1&&k<st.length;k++)rw[st[k].id]=1}G._qn=q.n;G._qid=q.id}   // 读档时已经完成的步骤不补发奖励
   if(q.n>G._qn&&!G.over){const st=CH!==2?questSteps():null;let got=[];
     for(let k=G._qn-1;k<q.n-1;k++){const id=st?st[k].id:'q2_'+k;if(rw[id])continue;rw[id]=1;const r=TUT_REW[id];if(r){give(r);got.push(fmtCost(r))}}
-    gainXP(40);const prev=st?st[G._qn-1]:null;showDone(prev?prev.t:'目标完成',['经验 +40'].concat(got).join('　'),q.t);save()}
+    sfx('quest');gainXP(40);const prev=st?st[G._qn-1]:null;showDone(prev?prev.t:'目标完成',['经验 +40'].concat(got).join('　'),q.t);save()}
   G._qn=q.n;G._qid=q.id;GUIDE.step=q;
   try{GUIDE.tgt=q.tgt?q.tgt():null}catch(e){GUIDE.tgt=null}
   // 新手阶段走进水里：箭头先指回营地，并提醒一次（游泳耗体力，体力没了会掉血）
