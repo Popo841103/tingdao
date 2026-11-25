@@ -36,7 +36,7 @@ const REGIONS={
     g:['#78c25c','#a2d670','#4f9c4a','#e9d6a6','#9a958c'],tile:'#3a8a96',sak:.4,float:1,fx:'petal',fog:'#e2ecf6',mkt:'仙坊',frs:'灵药谷',bch:'云海崖',home:'故居'},
   xy:{n:'下云州',side:'down',terr:'desert',sp:[0,1,3],mat:'合金板',perk:'jidong',boss:['机甲统领·铁砧','云州守城修士·白鹤'],
     g:['#e2c28a','#d6ae74','#c89a60','#eed8a8','#b08860'],tile:'#8a6a4a',sak:0,dead:1,tech:1,wat:'oasis',fx:'dust',fog:'#f0dcb8',sun:'#fff0c8',expo:1.08,mkt:'沙海集市',frs:'仙人掌林',bch:'绿洲',decor:'desert',grass:'#e8c890',noFlower:1,dry:1,beast:{wolf:['#c8a070','#ecd8b0'],boar:['#b08860','#d0b088']}},
-  xx:{n:'下玄州',side:'down',terr:'volcano',sp:[1,2,3],mat:'能量电池',perk:'hudun',boss:['熔炉工厂主·赤焰','玄州镇守·炎阳真人'],
+  xx:{n:'下玄州',side:'down',terr:'volcano',pano:'assets/sky/xx.jpg',sp:[1,2,3],mat:'能量电池',perk:'hudun',boss:['熔炉工厂主·赤焰','玄州镇守·炎阳真人'],
     g:['#3e3532','#5a3a2c','#2e2826','#4a3c34','#2a2422'],tile:'#3a2a2a',sak:0,dead:1,tech:1,wat:'lava',fx:'ash',fog:'#7a4a38',skyT:12,skyR:3,sun:'#ffb080',expo:.92,fogNear:60,fogFar:320,mkt:'熔炉镇',frs:'焦木林',bch:'黑沙滩',decor:'volcano',noGrass:1,noFlower:1,dry:1,beast:{wolf:['#4a2a2a','#7a3a2a','#ff4010'],boar:['#3a2a2a','#5a3a30']}},
   xt:{n:'下天州',side:'down',terr:'swamp',sp:[0,2,3],mat:'量子晶片',perk:'miaozhun',boss:['天网主脑·零','天州镇守·玄天老祖'],
     g:['#4f6e3a','#5f7e42','#3a5a2e','#5a5a3e','#5a5a50'],tile:'#3a5a4a',sak:0,crown:'#3a7a34',tech:1,wat:'swamp',fx:'firefly',fog:'#9aaa90',fogNear:50,fogFar:240,rainy:1,mkt:'泽畔集',frs:'雨林',bch:'泥沼岸',decor:'swamp',grass:'#8aa070',beast:{wolf:['#4a6a4a','#8aa080'],boar:['#4a4a3a','#6a6a50']}},

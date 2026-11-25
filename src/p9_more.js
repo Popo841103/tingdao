@@ -133,5 +133,12 @@ function updEnv(dt){const T=CH===2?REGD.terr:null;G.grav=T==='sky'?13:22;if(!T||
 /* 「互动」键附近没东西时：饿了就吃 */
 function actEat(){if(busy())return;if(G.hunger<96&&['cooked','grain','berry','meat','potion'].some(k=>(G.inv[k]||0)>0))eat()}
 
+/* ---------- 全景天空：某些州用 360° 全景图（等距柱状投影 2:1）代替程序天空，配置在 REGIONS 的 pano 字段 ---------- */
+const PANO={m:null};
+if(CH===2&&REGD.pano){new THREE.TextureLoader().load(REGD.pano,t=>{t.colorSpace=THREE.SRGBColorSpace;const g=new THREE.SphereGeometry(1200,48,24);g.scale(-1,1,1);
+  const m=new THREE.Mesh(g,new THREE.MeshBasicMaterial({map:t,fog:false,toneMapped:false,depthWrite:false}));m.renderOrder=-1;m.frustumCulled=false;scene.add(m);PANO.m=m;
+  sky.visible=false;stars.visible=false;moon.visible=false;cloudMat.visible=false},undefined,e=>console.warn('pano',e))}
+function updPano(){if(!PANO.m)return;PANO.m.position.copy(camera.position);const {day}=dayK();PANO.m.material.color.setScalar(.4+.6*day)}
+
 /* ---------- 每帧 ---------- */
-function moreTick(dt){P.dodgeCd=(P.dodgeCd||0)-dt;P.dodgeT=(P.dodgeT||0)-dt;updPrologue(dt);achCheck(dt);updEnv(dt)}
+function moreTick(dt){updPano();P.dodgeCd=(P.dodgeCd||0)-dt;P.dodgeT=(P.dodgeT||0)-dt;updPrologue(dt);achCheck(dt);updEnv(dt)}

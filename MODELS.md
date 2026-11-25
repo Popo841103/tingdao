@@ -79,6 +79,12 @@ npx @gltf-transform/cli@4.1.1 inspect 输出.glb
 2. 把 `'dragon'` 加进 `GROK_KEYS`
 3. 在 `src/p9_more.js` 的 `moreTick()` 里写一个绕圈飞行的更新（用 `GROKM.dragon.scene.clone(true)` 取模型，加进 `scene`），只在第一章（`CH===1`）显示
 
+### 360° 全景天空
+- 混元「世界模型 → 360°全景图」导出的是 2:1 的等距柱状投影图片，可以当某个州的天空。
+- 转成 2048×1024 的 JPG 放进 `assets/sky/<州代号>.jpg`，在 `src/p1_core.js` 的 `REGIONS` 里给那个州加 `pano:'assets/sky/<州代号>.jpg'`。
+- 代码在 `src/p9_more.js` 的「全景天空」一段：会关掉程序天空、云、星星、月亮，夜里自动变暗。
+- 已用：下玄州 `xx`（红色星球）。州代号：sy 上云 / sx 上玄 / st 上天 / sxian 上仙 / xy 下云 / xx 下玄 / xt 下天 / xxian 下仙 / tx 天墟。
+
 ## 4. 授权
 
 - 自己用混元生成的模型：先确认混元的用户协议是否允许商用。
