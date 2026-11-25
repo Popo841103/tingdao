@@ -80,7 +80,7 @@ for(const type in TREE_TYPES){const T_=TREE_TYPES[type],list=trees.filter(t=>t.t
   scene.add(a,b);treeIM[type]={a,b}}
 function setTree(t,vis){const I=treeIM[t.type];I.a.setMatrixAt(t.i,vis?t.m:ZERO);I.b.setMatrixAt(t.i,vis?t.m:ZERO);I.a.instanceMatrix.needsUpdate=I.b.instanceMatrix.needsUpdate=true;t.col.off=!vis}
 const falling=[];
-function fellTree(t,dirX,dirZ){sfx('treefall');setTree(t,false);t.alive=false;t.t=0;const T_=TREE_TYPES[t.type];
+function fellTree(t,dirX,dirZ){sfx('treefall');achTree();setTree(t,false);t.alive=false;t.t=0;const T_=TREE_TYPES[t.type];
   const g=new THREE.Group(),a=new THREE.Mesh(T_.trunk,T_.tm),b=new THREE.Mesh(T_.crown,T_.cm);a.castShadow=b.castShadow=true;g.add(a,b);
   g.position.set(t.x,H(t.x,t.z)-.15,t.z);g.scale.setScalar(t.s);scene.add(g);const ax=new THREE.Vector3(dirZ,0,-dirX).normalize();falling.push({g,ax,t:0})}
 

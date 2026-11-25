@@ -45,7 +45,7 @@ const take=(c)=>{for(const k in c)G.inv[k]=(G.inv[k]||0)-c[k]};
 const give=(c)=>{for(const k in c)G.inv[k]=(G.inv[k]||0)+c[k];sfx('pickup')};
 const fmtCost=(c)=>Object.entries(c).map(([k,v])=>ITEM[k]+v).join(' ');
 const ui={toast:()=>{},refresh:()=>{},trade:()=>{},end:()=>{},death:()=>{},bossBar:()=>{}};
-function toast(t,long){ui.toast(t,long)}
+function toast(t,long){if(G.prologue)return;ui.toast(t,long)}
 
 /* ---------- 特效：碎屑、飘字、地面警示圈 ---------- */
 const chipGeo=new THREE.BoxGeometry(.12,.12,.12),chips=[];
@@ -135,16 +135,16 @@ function populate(){
 }
 
 /* ---------- 伤害 ---------- */
-function hurtPlayer(d,fx,fz){if(G.dead||G.over||P.inv>0)return;P.inv=.35;G.med=false;if(P.st==='sit'||P.sitFire){P.sitFire=null;G.timeScale=1}if(G.perks&&G.perks.xuanjia)d*=.85;if(G.realm>=3)d*=.9;
+function hurtPlayer(d,fx,fz){if(!G.dead&&!G.over&&P.dodgeT>0){perfectDodge();return}if(G.dead||G.over||P.inv>0)return;P.inv=.35;G.med=false;if(P.st==='sit'||P.sitFire){P.sitFire=null;G.timeScale=1}if(G.perks&&G.perks.xuanjia)d*=.85;if(G.realm>=3)d*=.9;
   G.hp-=d;sfx('hurt');ftxt(P.x,P.y+1.9,P.z,'-'+Math.round(d),'hurt');burst(P.x,P.y+1.1,P.z,bloodMat,4,2);const dx=P.x-fx,dz=P.z-fz,l=Math.hypot(dx,dz)||1;P.kx=dx/l*7;P.kz=dz/l*7;
   if(P.model)play(P.model,'hurt',.3);$('#hurt').classList.remove('on');void $('#hurt').offsetWidth;$('#hurt').classList.add('on');if(navigator.vibrate)try{navigator.vibrate(40)}catch(e){}
   if(G.hp<=0){if(G.trib){tribFail();return}G.hp=0;die()}}
 function die(){sfx('death');G.flying=false;G.med=false;G.dead=true;P.st='dead';later(1.6,()=>ui.death())}
-function hurtActor(a,d,fx,fz,kb=5,stun=0){if(a.dead)return;a.hp-=d;sfx(a.beast?'flesh':'hit',d>=30);a.hitT=4;a.pop=.15;ftxt(a.x,a.y+a.h,a.z,Math.round(d),d>=30?'crit':'');
+function hurtActor(a,d,fx,fz,kb=5,stun=0){if(a.dead)return;a.hp-=d;sfx(a.beast?'flesh':'hit',d>=30);hitStop(a.hp<=0?.11:d>=30?.07:.045);a.hitT=4;a.pop=.15;ftxt(a.x,a.y+a.h,a.z,Math.round(d),d>=30?'crit':'');
   burst(a.x,a.y+a.h*.6,a.z,a.beast?bloodMat:hitMat,5,2.4);const dx=a.x-fx,dz=a.z-fz,l=Math.hypot(dx,dz)||1;const kk=a.boss?kb*.25:kb;a.kx=dx/l*kk;a.kz=dz/l*kk;a.stun=Math.max(a.stun||0,stun);
   a.angry=true;if(a.human)play(a.obj,'hurt',.3);else a.obj.act={k:'hurt',t:0,d:.3};if(a.def&&a.def.flee){a.wound=true;a.tired=Math.max(a.tired||0,1.2)}
   if(a.hp<=0){a.hp=0;a.dead=true;a.deadT=0;gainXP(Math.round((a.boss?300:a.xinmo?150:a.guard2?120:a.human?30:({rabbit:5,deer:10,boar:20,wolf:25,ghost:18}[a.kind]||10))*DIFF));if(!a.human)gainQi(a.guard2?30:4);if(a.human){a.obj.act=null}
-    sfx(a.boss?'gong':'kill');if(a.boss){G.bossDead=true;ui.bossBar(null);bossDefeated(a)}
+    sfx(a.boss?'gong':'kill');achKill(a);if(a.boss){G.bossDead=true;ui.bossBar(null);bossDefeated(a)}
     else if(a.xinmo){tribSuccess()}
     else if(a.ghost){gainQi(8);const l={};if(Math.random()<.45)l.ling=1;if(Math.random()<.25)l.herb=1;if(Object.keys(l).length)give(l);toast('游魂消散'+(Object.keys(l).length?'：'+fmtCost(l):'')+'，灵气 +8')}
     else if(a.human){const l={ling:1+(Math.random()<.5?1:0)};if(Math.random()<.3)l.potion=1;if(G.faction==='B'&&Math.random()<.4)l.arrow=3;give(l);toast('击败'+a.name+'：'+fmtCost(l));RESP.push({t:300,fn:()=>!G.bossDead&&spawnSoldier(...(randAround(ZONES.enemy.x,ZONES.enemy.z,4,20)||[ZONES.enemy.x,ZONES.enemy.z]))})}
@@ -176,7 +176,7 @@ function shoot(kind,a,spd,dmg){const fx=Math.sin(P.yaw),fz=Math.cos(P.yaw);let m
   let vx=fx*spd,vz=fz*spd,vy=kind==='bomb'?7:kind==='stone'?3:0;let sy=P.y+1.4;
   if(a){const dx=a.x-P.x,dz=a.z-P.z,d=Math.hypot(dx,dz);vx=dx/d*spd;vz=dz/d*spd;if(kind==='bomb'){const t=d/spd;vy=(a.y-sy)/t+9*t}else if(kind!=='stone')vy=(a.y+a.h*.6-sy)/(d/spd);else{const t=d/spd;vy=(a.y+a.h*.6-sy)/t+9*t}}
   sfx(kind==='fire'?'fire':kind==='thunder'?'thunderShot':kind==='bolt'?'bow':'throw');m.position.set(P.x+fx*.6,sy,P.z+fz*.6);scene.add(m);PROJ.push({m,vx,vy,vz,kind,dmg,t:0,g:kind==='bomb'||kind==='stone'?18:0})}
-function skill(){if(busy()||P.atkCd>0)return;if(G.skillSel&&G.skillSel!=='base'){castSkill(G.skillSel);return}const a=nearestFoe(32,.9);if(a)P.yaw=Math.atan2(a.x-P.x,a.z-P.z);
+function skill(){if(busy()||P.atkCd>0)return;if(ENV.emp>0){toast('电磁风暴中，技能失灵');return}if(G.skillSel&&G.skillSel!=='base'){castSkill(G.skillSel);return}const a=nearestFoe(32,.9);if(a)P.yaw=Math.atan2(a.x-P.x,a.z-P.z);
   if(G.faction==='A'){if(G.mana<20){toast('灵力不足（每秒自动恢复）');return}G.mana-=20;const th=G.tools.thunder;play(P.model,'throw',.45);P.atkCd=.5;later(.2,()=>shoot(th?'thunder':'fire',a,24,(th?44:30)*G.atkMul*G.skillMul));return}
   if(G.tools.bow&&(G.inv.arrow||0)>0){G.inv.arrow--;play(P.model,'throw',.35);P.atkCd=.55;later(.12,()=>shoot('bolt',a,42,40*G.atkMul*G.skillMul));return}
   if((G.inv.bomb||0)>0){G.inv.bomb--;play(P.model,'throw',.5);P.atkCd=.8;later(.25,()=>shoot('bomb',a,14,65));return}
@@ -248,13 +248,13 @@ function updPlayer(dt){const h=P.model;P.atkCd-=dt;P.inv-=dt;P.lock-=dt;
   else{
     if(IN.jump&&P.ground&&G.sta>6&&P.lock<=0&&!G.flying){sfx('jump');P.vy=8.6;P.ground=false;G.sta-=6;P.dj=0}else if(IN.jump&&!P.ground&&G.realm>=1&&!P.dj&&G.sta>8&&!G.flying){P.vy=8.2;P.dj=1;G.sta-=8;burst(P.x,P.y,P.z,hitMat,6,2)}
     const upd=inUpdraft();const gliding=!G.flying&&!P.ground&&IN.jumpHeld&&(G.tools.glider||G.realm>=1)&&(P.vy<-.5||(upd&&P.st==='glide'))&&G.sta>0&&P.y-gy>1.2;
-    if(G.flying){P.vy=IN.jumpHeld?6:-1.3}else{P.vy-=(gliding?6:22)*dt;if(gliding){P.vy=upd?Math.min(P.vy+22*dt,7.5):Math.max(P.vy,-1.9);G.sta-=(upd?0:2.5)*dt}}
+    if(G.flying){P.vy=IN.jumpHeld?6:-1.3}else{P.vy-=(gliding?6:(G.grav||22))*dt;if(gliding){P.vy=upd?Math.min(P.vy+22*dt,7.5):Math.max(P.vy,-1.9);G.sta-=(upd?0:2.5)*dt}}
     P.y+=P.vy*dt;if(P.y<=gy){P.y=gy;P.vy=0;P.ground=true}else if(P.y-gy>.25||P.vy>0)P.ground=false;
     if(gliding||(G.flying&&!P.ground))P.st='glide';else if(!P.ground)P.st='air';else if(P.sitFire||G.med)P.st='sit';else if(P.lock>0&&(P.st==='kneel'||P.st==='pour')){}else P.st='walk'}
   IN.jump=false;
   P.sp=P.st==='glide'?8:Math.hypot(vx,vz);
   if(!run&&P.st!=='swim'&&P.st!=='glide')G.sta=Math.min(G.maxsta,G.sta+(P.sitFire?30:16)*dt*(P.sp<.2?1.4:1));
-  if(P.glider)P.glider.visible=P.st==='glide';
+  if(P.glider)P.glider.visible=P.st==='glide'&&!G.flying;
   animate(h,P.st==='walk'?'idle':P.st,P.sp,dt);place(h)}
 function animate(h,st,sp,dt){if(h.glb)animGLB(h,st,sp,dt);else animHuman(h,st,sp,dt)}
 function place(h){h.position.set(P.x,P.y,P.z);h.rotation.y=P.yaw}
@@ -339,11 +339,11 @@ function quest2(){const f=G.flags,A=G.faction==='A';const steps=[
 /* ---------- 存档 ---------- */
 const SAVE_KEY='td5_save';
 function writeSave(s){const j=JSON.stringify(s);localStorage.setItem(SAVE_KEY,j);if(s&&s.faction)localStorage.setItem(SAVE_KEY+'_'+s.faction,j)}
-function save(){if(G.dead||G.hp<=0)return;try{writeSave(saveObj())}catch(e){}}
+function save(){if(G.dead||G.hp<=0||G.prologue)return;try{writeSave(saveObj())}catch(e){}}
 function saveObj(){return({v:2,reg:REGK,qi:G.qi,wtier:G.wtier,cleared:G.cleared,bases:G.bases,rflags:Object.assign({},G.rflags,{[REGK]:G.flags}),pets:PETS.map(p=>({kind:p.kind,name:p.name,role:p.role,big:p.big})),perks:G.perks,skillSel:G.skillSel,ch:CH,realm:G.realm,lv:G.lv,xp:G.xp,pts:G.pts,st:G.st,faction:G.faction,origin:G.origin,inv:G.inv,tools:G.tools,hp:G.hp,hunger:G.hunger,sta:G.sta,mana:G.mana,hour:G.hour,day:G.day,weapon:G.weapon,water:G.water,flags:G.flags,bossDead:G.bossDead,x:P.x,z:P.z,
   builds:G.builds.map(b=>({t:b.t,x:b.x,z:b.z,ry:b.ry,stage:b.stage,g:b.g}))})}
 function loadSave(){try{return JSON.parse(localStorage.getItem(SAVE_KEY)||'null')}catch(e){return null}}
-function ending(kind){if(G.over)return;G.over=true;const f=FACTION[G.faction],home=ORIGINS[G.faction][G.origin];
+function ending(kind){if(G.over)return;achEnd(kind);G.over=true;const f=FACTION[G.faction],home=ORIGINS[G.faction][G.origin];
   if(kind==='final'){ui.end(G.faction==='A'?'白日飞升':'机械飞升','你在第 '+G.day+' 天登上天墟，击败了天道化身。<br>九州归一，'+realmN(G.realm)+'境界的你'+(G.faction==='A'?'踏云而上，白日飞升。':'把意识上传到星海，完成了机械飞升。')+'<br>等级 '+G.lv+'，收服灵兽 '+PETS.length+' 只。','final');try{localStorage.removeItem(SAVE_KEY)}catch(e){}return}
   if(kind==='escape'){const b=G.builds.find(b=>b.t==='boat');P.model.visible=false;G.endBoat=b;
     ui.end('灵舟远航','你在第 '+G.day+' 天驾着灵舟离开中州·灵河界，顺着灵河入海，回到了'+home+'。<br>'+f.from+'的人们会听你讲起这片土地的故事。','escape')}
@@ -357,7 +357,7 @@ function applyOrigin(){const o=G.origin,RB=REALMS[G.realm||0];G.maxhp=(o==='天'
 /* ---------- 等级与经验：打怪、砍树、采集、制造、建造、完成目标都加经验；每升一级生命回满并获得 2 个属性点 ---------- */
 const needXP=l=>40+l*35;
 function rankName(){return realmN(G.realm||0)+' · '+G.lv+' 级'}
-function gainXP(n){if(G.over||!G.started)return;G.xp+=n;ftxt(P.x,P.y+2.3,P.z,'+'+n+' 经验','xp');let up=0;while(G.lv<50&&G.xp>=needXP(G.lv)){G.xp-=needXP(G.lv);G.lv++;G.pts+=2;up++}
+function gainXP(n){if(G.over||!G.started||G.prologue)return;G.xp+=n;ftxt(P.x,P.y+2.3,P.z,'+'+n+' 经验','xp');let up=0;while(G.lv<50&&G.xp>=needXP(G.lv)){G.xp-=needXP(G.lv);G.lv++;G.pts+=2;up++}
   if(up){sfx('levelup');const r=G.hp/G.maxhp;applyOrigin();G.hp=G.maxhp;G.sta=G.maxsta;if(G.maxmana)G.mana=G.maxmana;burst(P.x,P.y+1,P.z,MAT.gold,18,3);ftxt(P.x,P.y+2.8,P.z,'升级！','lvup');
     toast('升级了！'+rankName()+'：生命体力回满，获得 '+(2*up)+' 个属性点（点左上角「加点」）',1);save()}}
 async function startGame(fac,origin,sv){G.starting=true;try{await grokPreload()}catch(e){}

@@ -118,6 +118,19 @@ html,body{margin:0;height:100%;overflow:hidden;background:#9fd3ea;font-family:"P
 #death{background:rgba(60,30,30,.6);color:#fff}#death h1{color:#ffd0c0}
 @media (max-height:480px){#quest{top:calc(100px + env(safe-area-inset-top));font-size:11.5px}#mm{width:120px;height:120px}#acts{transform:scale(.85);transform-origin:right bottom}#start h1{font-size:28px}}
 @media (min-width:900px) and (pointer:fine){#joyHint{display:none}}
+#eatB,#runB{display:none!important}
+#dodgeB{right:184px;bottom:2px;width:62px;height:62px;font-size:14px;background:radial-gradient(circle at 40% 35%,#9af0d0,#2aa880)}
+#atabs{display:flex;gap:6px;margin-bottom:6px;position:sticky;top:0;background:inherit}#atabs button{font:inherit;flex:1;border:0;border-radius:10px;padding:7px;background:#eee;font-weight:700;cursor:pointer}#atabs .sel{background:#ffcf7a}
+#envB{font-size:12px;font-weight:700;color:#a0502a;margin-top:2px}
+#pro{position:fixed;inset:0;z-index:28;pointer-events:none;display:none}#pro.on{display:block}
+#pro .cap{position:absolute;left:50%;top:22%;transform:translateX(-50%);width:min(640px,90vw);text-align:center;color:#fff;font-size:19px;line-height:1.75;text-shadow:0 2px 6px rgba(0,0,0,.8),0 0 2px #000;opacity:0}
+#pro .cap b{color:#ffe08a;font-size:22px}#pro .cap.on{animation:capIn .8s forwards}@keyframes capIn{from{opacity:0;transform:translate(-50%,10px)}to{opacity:1;transform:translate(-50%,0)}}
+#proSkip{position:absolute;right:calc(14px + env(safe-area-inset-right));top:calc(12px + env(safe-area-inset-top));pointer-events:auto;font:inherit;font-size:14px;border:0;border-radius:999px;padding:8px 16px;background:rgba(0,0,0,.45);color:#fff;cursor:pointer;z-index:2}
+#pro .flash{position:absolute;inset:0;background:#fff;opacity:0}#pro .flash.on{animation:flash 1.2s}@keyframes flash{0%{opacity:1}100%{opacity:0}}
+body.inpro #quest,body.inpro #wp,body.inpro #ip,body.inpro #qdone,body.inpro #inv,body.inpro #mmw{visibility:hidden}
+#achPop{position:fixed;left:50%;top:calc(70px + env(safe-area-inset-top));transform:translate(-50%,-20px);z-index:46;background:linear-gradient(#fff8e0,#ffe9b0);border:2px solid #f0c060;border-radius:14px;padding:8px 18px;text-align:center;box-shadow:0 6px 20px rgba(0,0,0,.25);opacity:0;pointer-events:none;min-width:200px}
+#achPop small{display:block;color:#a06a10;font-weight:700}#achPop b{display:block;font-size:18px;color:#6a4a10}#achPop span{font-size:12.5px;color:#7a6a50}
+#achPop.on{animation:achIn 4s forwards}@keyframes achIn{0%{opacity:0;transform:translate(-50%,-20px)}10%,82%{opacity:1;transform:translate(-50%,0)}100%{opacity:0;transform:translate(-50%,-20px)}}
 </style></head><body>
 <div id="rot"><b>📱</b>请把手机横过来玩<br><span style="font-size:14px;opacity:.75">（如果转不过来：打开手机的「自动旋转」，关掉「竖屏锁定」）</span></div><canvas id="c"></canvas>
 <div id="loading"><b>听道</b><div>正在加载 3D 引擎…</div><div id="lmsg" style="font-size:13px;color:#8a7a60"></div></div>
@@ -127,7 +140,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#9fd3ea;font-family:"P
   <div class="fac" data-f="B"><b>⚙ 穿越者</b><small>来自下四州的穿越者。会做工兵铲、弩和火药包，远程火力强。</small></div></div>
   <div id="origins"></div>
   <div class="btns"><button class="big" id="newg">开始新游戏</button><button class="big alt" id="cont" style="display:none">继续</button><button class="big ghost" id="m9s">九洲图</button></div>
-  <div class="keys">手机：左半屏拖动=移动（推到底=跑）· 右半屏拖动=转视角 · 右下角按钮操作<br>电脑：WASD 移动 · Shift 跑 · 空格 跳（空中按住=滑翔）· 鼠标拖动转视角 · 左键/F 攻击 · 右键/R 技能 · E 互动 · Q 吃 · C 制造 · M 九洲图 · 1-6 换武器</div>
+  <div class="keys">手机：左半屏拖动=移动（推到底=跑）· 右半屏拖动=转视角 · 右下角按钮操作（「闪避」在敌人出手瞬间按=完美闪避）<br>电脑：WASD 移动 · Shift 跑 · 空格 跳（空中按住=滑翔）· 鼠标拖动转视角 · 左键/F 攻击 · 右键/R 技能 · V 闪避 · E 互动 · Q 吃 · C 制造 · J 成就 · M 九洲图 · 1-6 换武器</div>
 </div></div>
 <div id="hud" style="display:none">
   <div id="stats" class="pan">
@@ -141,13 +154,13 @@ html,body{margin:0;height:100%;overflow:hidden;background:#9fd3ea;font-family:"P
   <div id="quest" class="pan"></div>
   <div id="inv"></div>
   <div id="boss"><span id="bossN"></span><div class="t"><i id="bossF"></i></div></div>
-  <div id="mmw" class="pan pe"><canvas id="mm" width="320" height="320"></canvas><div class="sm"><button id="petB">灵兽</button><button id="mapB">九洲</button><button id="setB">设置</button></div><div class="sm"><button id="mmT">隐藏地图</button><button id="quitB" style="background:#ffe9c7;color:#8a4a10">存档退出</button></div><div id="fps"></div></div>
+  <div id="mmw" class="pan pe"><canvas id="mm" width="320" height="320"></canvas><div class="sm"><button id="petB">灵兽</button><button id="achB">成就</button><button id="mapB">九洲</button><button id="setB">设置</button></div><div class="sm"><button id="mmT">隐藏地图</button><button id="quitB" style="background:#ffe9c7;color:#8a4a10">存档退出</button></div><div id="fps"></div></div>
   <div id="toast"></div>
   <div id="joyHint">按住拖动<br>移动</div>
   <div id="acts" class="pe">
     <button class="ab" id="atkB">攻击</button><button class="ab" id="jumpB">跳</button><button class="ab" id="actB">互动</button>
     <button class="ab" id="skillB">技能</button><button class="ab" id="eatB">吃</button><button class="ab" id="runB">跑</button>
-    <button class="ab" id="wpnB"><span id="wpn">空手</span></button><button class="ab" id="craftB">制造</button><button class="ab" id="medB">修炼</button><button class="ab" id="swB">换</button>
+    <button class="ab" id="wpnB"><span id="wpn">空手</span></button><button class="ab" id="craftB">制造</button><button class="ab" id="medB">修炼</button><button class="ab" id="dodgeB">闪避</button><button class="ab" id="swB">换</button>
   </div>
 </div>
 <div id="joy"><div id="knob"></div></div>
@@ -160,6 +173,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#9fd3ea;font-family:"P
 <div class="modal" id="pets"><div class="pan"><h2>灵兽<button class="x" data-close="pets">✕</button></h2><div class="list" id="plist"></div><div class="lore" id="pinfo"></div></div></div>
 <div class="modal" id="route"><div class="pan"><h2>九州航线图<button class="x" data-close="route">✕</button></h2><div class="lore">每击败一州的首领，就解锁去下一州的航线。越往后越难，终点是「天墟·九州之巅」。去过的州随时可以回去。</div><div class="list" id="rlist"></div></div></div>
 <div class="modal" id="stat"><div class="pan"><h2>人物 · 加点<button class="x" data-close="stat">✕</button></h2><div class="lore" id="slv"></div><div class="list" id="slist"></div><div class="lore" id="sder"></div></div></div>
+<div class="modal" id="ach"><div class="pan"><h2>成就 · 图鉴<button class="x" data-close="ach">✕</button></h2><div class="list" id="alist"></div></div></div>
 <div class="modal" id="set"><div class="pan"><h2>设置<button class="x" data-close="set">✕</button></h2>
   <div class="srow"><button id="qBtn">画质</button><button id="sndBtn">音效：开</button><button id="musBtn">音乐：开</button><button id="saveBtn">立即存档</button><button id="quitBtn">保存并回到主菜单</button></div>
   <div class="lore"><b>存档备份</b>：存档只保存在这个浏览器里，换手机或清理缓存会丢失。可以导出成文件保存，之后再导入。</div>

@@ -7,7 +7,7 @@ let toastT=0;ui.toast=(t,long)=>{const e=el('toast');e.textContent=t;e.classList
 const BARS=['hp','hunger','sta','mana'];
 ui.refresh=()=>{el('wpn').textContent=WEAPONS[G.weapon].n};
 ui.bossBar=a=>{const b=el('boss');if(!a){b.style.display='none';return}b.style.display='block';el('bossN').textContent=a.name;el('bossF').style.width=(a.hp/a.maxhp*100)+'%'};
-function panel(id,on){el(id).classList.toggle('on',on);G.paused=['craft','trade','map9','set','bigmap','stat','pets','route'].some(k=>el(k).classList.contains('on'))}
+function panel(id,on){el(id).classList.toggle('on',on);G.paused=['craft','trade','map9','set','bigmap','stat','pets','route','ach'].some(k=>el(k).classList.contains('on'))}
 document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>panel(b.dataset.close,false));
 
 /* ---------- 开始界面 ---------- */
@@ -21,7 +21,7 @@ function drawStart(){document.querySelectorAll('.fac').forEach(c=>c.classList.to
   newArm=false;el('newg').textContent=s?'新游戏（'+FACTION[pickF].n+'）':'新游戏'}
 document.querySelectorAll('.fac').forEach(c=>c.onclick=()=>{pickF=c.dataset.f;if(!(ORIGINS[pickF]||{})[pickO])pickO=Object.keys(ORIGINS[pickF])[0];drawStart()});drawStart();
 function landLock(){try{if(matchMedia('(pointer:coarse)').matches){const d=document.documentElement,f=d.requestFullscreen||d.webkitRequestFullscreen;const lk=()=>{try{screen.orientation&&screen.orientation.lock&&screen.orientation.lock('landscape').catch(()=>{})}catch(e){}};if(f&&!document.fullscreenElement&&!matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches){const r=f.call(d);r&&r.then?r.then(lk,()=>{}):lk()}else lk()}}catch(e){}}
-async function go(sv){landLock();el('start').style.display='none';el('hud').style.display='';await startGame(sv?sv.faction:pickF,sv?sv.origin:pickO,sv);if(G.faction!=='A')el('manaRow').firstChild.textContent='能量';
+async function go(sv){landLock();el('start').style.display='none';el('hud').style.display='';await startGame(sv?sv.faction:pickF,sv?sv.origin:pickO,sv);if(!sv&&CH!==2)try{startPrologue()}catch(e){console.warn('prologue',e)}if(G.faction!=='A')el('manaRow').firstChild.textContent='能量';
   el('skillB').textContent=G.faction==='A'?'火符':'射击';}
 el('newg').onclick=()=>{if(slot(pickF)&&!newArm){newArm=true;el('newg').textContent='再点一次：覆盖'+FACTION[pickF].n+'的旧存档开新局';return}
   try{localStorage.removeItem(SAVE_KEY+'_'+pickF)}catch(e){}
@@ -56,20 +56,20 @@ function tap(id,down,up){const b=el(id);const d=e=>{e.preventDefault();e.stopPro
 let atkHold=false;
 tap('atkB',()=>{atkHold=true;attack()},()=>atkHold=false);
 tap('jumpB',()=>{IN.jump=true;IN.jumpHeld=true},()=>IN.jumpHeld=false);
-tap('actB',()=>{const t=findInteract();if(t&&!busy())t.fn()});
+tap('actB',()=>{const t=findInteract();if(t&&!busy())t.fn();else if(!t)actEat()});tap('dodgeB',()=>dodge());tap('achB',()=>{drawAch();panel('ach',true)});
 tap('skillB',()=>skill());tap('eatB',()=>eat());tap('wpnB',()=>nextWeapon());
 tap('runB',()=>{runLock=!runLock;el('runB').classList.toggle('lit',runLock);if(joy.id===null)IN.run=runLock});
 tap('craftB',()=>{if(GUIDE.tab)craftTab=GUIDE.tab;drawCraft();panel('craft',true)});tap('mapB',()=>{draw9();panel('map9',true)});tap('setB',()=>{drawSet();panel('set',true)});
 /* 键盘 */
 const K={};addEventListener('keydown',e=>{if(e.repeat&&e.code!=='Space')return;K[e.code]=true;if(!G.started)return;
   if(e.code==='Space'){IN.jump=!e.repeat;IN.jumpHeld=true;e.preventDefault()}
-  if(e.code==='KeyE'){const t=findInteract();if(t&&!busy())t.fn()}if(e.code==='KeyF')attack();if(e.code==='KeyR')skill();if(e.code==='KeyQ')eat();
+  if(e.code==='KeyE'){const t=findInteract();if(t&&!busy())t.fn();else if(!t)actEat()}if(e.code==='KeyV'||e.code==='ControlLeft'){e.preventDefault();dodge()}if(e.code==='KeyJ'){const on=!el('ach').classList.contains('on');if(on)drawAch();panel('ach',on)}if(e.code==='KeyF')attack();if(e.code==='KeyR')skill();if(e.code==='KeyQ')eat();
   if(e.code==='KeyC'||e.code==='Tab'){e.preventDefault();const on=!el('craft').classList.contains('on');if(on)drawCraft();panel('craft',on)}
   if(e.code==='KeyN'){setMM(!el('mmw').classList.contains('nomap'))}
   if(e.code==='KeyM'){const on=!el('map9').classList.contains('on');if(on)draw9();panel('map9',on)}
   if(e.code==='KeyP'){const on=!el('stat').classList.contains('on');if(on)drawStat();panel('stat',on)}
   if(e.code==='KeyT')cycleSkill();if(e.code==='KeyG')startMeditate();if(e.code==='KeyH'){const on=!el('pets').classList.contains('on');if(on)drawPets();panel('pets',on)}
-  if(e.code==='Escape')['craft','trade','map9','set','bigmap','stat','pets','route'].forEach(k=>panel(k,false));
+  if(e.code==='Escape')['craft','trade','map9','set','bigmap','stat','pets','route','ach'].forEach(k=>panel(k,false));
   const n=['Digit1','Digit2','Digit3','Digit4','Digit5','Digit6'].indexOf(e.code);if(n>=0){const own=WORDER.filter(w=>w==='fist'||G.tools[w]);if(own[n])equip(own[n])}});
 addEventListener('keyup',e=>{K[e.code]=false;if(e.code==='Space')IN.jumpHeld=false});
 function keyMove(){if(joy.id!==null)return;let x=0,z=0;if(K.KeyW||K.ArrowUp)z+=1;if(K.KeyS||K.ArrowDown)z-=1;if(K.KeyA||K.ArrowLeft)x-=1;if(K.KeyD||K.ArrowRight)x+=1;const l=Math.hypot(x,z)||1;IN.mx=x/l;IN.mz=z/l;IN.run=!!(K.ShiftLeft||K.ShiftRight)||runLock}
@@ -156,7 +156,7 @@ function updHUD(dt){hudT-=dt;
   el('hpF').style.width=(G.hp/G.maxhp*100)+'%';el('hungerF').style.width=G.hunger+'%';el('staF').style.width=(G.sta/G.maxsta*100)+'%';if(G.maxmana)el('manaF').style.width=(G.mana/G.maxmana*100)+'%';
   el('hpV').textContent=Math.ceil(G.hp);el('hungerV').textContent=Math.ceil(G.hunger);
   if(toastT>0){toastT-=dt;if(toastT<=0)el('toast').classList.remove('on')}
-  const it=findInteract();GUIDE.it=it;const ab=el('actB');ab.textContent=it?it.label:'互动';ab.classList.toggle('lit',!!it);
+  const it=findInteract();GUIDE.it=it;const ab=el('actB');const food=!it&&G.hunger<80&&['cooked','grain','berry','meat','potion'].some(k=>(G.inv[k]||0)>0);ab.textContent=it?it.label:food?'吃':'互动';ab.classList.toggle('lit',!!it||food);
   if(hudT>0)return;hudT=.25;{const sb=el('stats').getBoundingClientRect();el('quest').style.top=(sb.bottom+6)+'px';if(innerWidth>720){el('inv').style.left=(sb.right+8)+'px';el('inv').style.right=(el('mmw').getBoundingClientRect().width+24)+'px'}}
   const hh=Math.floor(G.hour),mi=Math.floor((G.hour-hh)*60);el('clock').textContent=`第${G.day}天 ${String(hh).padStart(2,'0')}:${String(mi).padStart(2,'0')} ${G.rain?'🌧':G.hour>=6&&G.hour<18.5?'☀':'🌙'}`;
   const zn=zoneOf(P.x,P.z);const zname=zn?ZONES[zn].name:(WATER_Y-groundAt(P.x,P.z)>.5?(REGD.wat==='lava'?'岩浆中':'水中'):REGD.n);el('zone').textContent=zname;if(zn&&zn!==lastZone){toast('来到 '+ZONES[zn].name);if(zn==='market')G.flags.visitM=1}lastZone=zn||'';
@@ -209,7 +209,7 @@ function updDyn(dt,t){
 /* ---------- 主循环 ---------- */
 const clock=new THREE.Clock();let fpsV=60,fpsN=0,fpsT=0,simT=0;
 function resize(){const w=innerWidth,h=innerHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix()}addEventListener('resize',resize);resize();
-function frame(){requestAnimationFrame(frame);const rawDt=clock.getDelta();let dt=Math.min(rawDt,.05);fpsN++;fpsT+=rawDt;   // 帧率按真实时间算（以前用截断后的 dt，低于 20 帧时也会显示 20）
+function frame(){requestAnimationFrame(frame);const rawDt=clock.getDelta();let dt=Math.min(rawDt,.05);dt=timeWarp(dt,rawDt);fpsN++;fpsT+=rawDt;   // 帧率按真实时间算（以前用截断后的 dt，低于 20 帧时也会显示 20）
   if(fpsT>.5){fpsV=fpsN/fpsT;fpsN=0;fpsT=0}
   if(!G.started){CAM.yaw+=dt*.05;const t=performance.now()/1000;if(!G.starting){P.x=ZONES.market.x;P.z=ZONES.market.z}P.y=groundAt(P.x,P.z);updSky(0);updCam(dt);WU.uTime.value=t;GU.uTime.value=t;renderer.render(scene,camera);return}
   const run=!G.paused;simT+=run?dt:0;
@@ -217,14 +217,14 @@ function frame(){requestAnimationFrame(frame);const rawDt=clock.getDelta();let d
     const ts=G.timeScale;G.hour+=dt*24/DAY_LEN*ts;if(G.hour>=24){G.hour-=24;G.day++}
     if(!G.dead&&!G.over&&P.st!=='sleep'){G.hunger=Math.max(0,G.hunger-dt*.19*G.hungerMul*(G.med?1:ts)*(IN.run?1.4:1));
       if(G.hunger<15&&!busy()){const fd=[['cooked',38,'烤肉'],['grain',26,'灵谷'],['berry',9,'浆果']].find(f=>(G.inv[f[0]]||0)>0);if(fd){G.inv[fd[0]]--;G.hunger=Math.min(100,G.hunger+fd[1]);toast('肚子饿了，自动吃了'+fd[2]+'（饱食+'+fd[1]+'）')}}
-      G._hw=(G._hw||0)-dt;if(G.hunger<30&&G._hw<=0){G._hw=G.hunger<=0?6:25;if(G.med&&G.hunger<10){G.med=false;G.timeScale=1}toast(G.hunger<=0?'⚠ 饿得一直掉血！快点「吃」，或去摘浆果、打猎烤肉':'肚子饿了，记得点「吃」',G.hunger<=0?1:0)}
+      G._hw=(G._hw||0)-dt;if(G.hunger<30&&G._hw<=0){G._hw=G.hunger<=0?6:25;if(G.med&&G.hunger<10){G.med=false;G.timeScale=1}toast(G.hunger<=0?'⚠ 饿得一直掉血！快点「互动」键吃东西，或去摘浆果、打猎烤肉':'肚子饿了，记得点「互动」键吃东西',G.hunger<=0?1:0)}
       if(G.hunger<=0){G.hp-=dt*1.2;if(G.hp<=0){G.hp=0;die()}}else if(G.hunger>45&&G.hp<G.maxhp)G.hp=Math.min(G.maxhp,G.hp+dt*.5*(P.sitFire?3:1));
       if(G.maxmana&&!G.flying)G.mana=Math.min(G.maxmana,G.mana+dt*2.2*(G.perks&&G.perks.fanying?2:1))}
     for(let i=LATER.length-1;i>=0;i--){LATER[i].t-=dt;if(LATER[i].t<=0){const f=LATER[i].fn;LATER.splice(i,1);f()}}
     for(let i=RESP.length-1;i>=0;i--){RESP[i].t-=dt*ts;if(RESP[i].t<=0){const f=RESP[i].fn;RESP.splice(i,1);f()}}
-    if(!G.over)updPlayer(dt);for(let i=ACT.length-1;i>=0;i--)if(ACT[i])updActor(ACT[i],dt);updProj(dt);updChips(dt);updRaid();updExtra(dt);
+    if(!G.over)updPlayer(dt);for(let i=ACT.length-1;i>=0;i--)if(ACT[i])updActor(ACT[i],dt);updProj(dt);updChips(dt);updRaid();updExtra(dt);moreTick(dt);
     for(let i=FX_RINGS.length-1;i>=0;i--)if(FX_RINGS[i].upd(dt))FX_RINGS.splice(i,1);
     G.played+=dt;if(G.played>90){G.played=0;if(!G.dead&&!G.over)save()}}
   updSky(dt);updDyn(dt,simT);updCam(dt);updFX(dt);updHUD(dt);updGuide(dt,simT);renderer.render(scene,camera)}
 frame();el('loading').style.display='none';el('start').style.display='';
-window.__game={spawnGhost,gainXP,drawStat,G,P,CAM,IN,ACT,nodes,trees,attack,skill,eat,craft,findInteract,startGame,go,save,importGLB,useGLB,renderer,scene,camera,THREE,spawnBeast,hurtActor,ending,equip,ZONES,groundAt,H,WATER_Y,riverX,panel};
+window.__game={dodge,hurtPlayer,spawnGhost,gainXP,drawStat,G,P,CAM,IN,ACT,nodes,trees,attack,skill,eat,craft,findInteract,startGame,go,save,importGLB,useGLB,renderer,scene,camera,THREE,spawnBeast,hurtActor,ending,equip,ZONES,groundAt,H,WATER_Y,riverX,panel};
