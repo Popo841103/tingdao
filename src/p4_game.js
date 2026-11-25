@@ -154,7 +154,7 @@ function meleeHit(range,dmg,arc=1.25,kb=5){const fx=Math.sin(P.yaw),fz=Math.cos(
 function nearestFoe(maxD,cone){let best=null,bd=maxD;const fx=Math.sin(P.yaw),fz=Math.cos(P.yaw);for(const a of ACT){if(a.dead||!a.obj.visible)continue;const dx=a.x-P.x,dz=a.z-P.z,d=Math.hypot(dx,dz);if(d>bd)continue;if(cone&&(dx*fx+dz*fz)/(d||1)<Math.cos(cone))continue;best=a;bd=d}return best}
 
 /* ---------- 玩家动作：攻击 / 技能 / 互动 / 吃 ---------- */
-function frontTree(){let best=null,bd=1e9;const fx=Math.sin(P.yaw),fz=Math.cos(P.yaw);for(const c of nearCols(P.x,P.z)){const t=c.tree;if(!t||!t.alive)continue;const dx=t.x-P.x,dz=t.z-P.z,d=Math.hypot(dx,dz);if(d>c.r+1.5)continue;if(d>c.r+.6&&(dx*fx+dz*fz)/d<.2)continue;if(d<bd){bd=d;best=t}}return best}
+function frontTree(){let best=null,bd=1e9;const fx=Math.sin(P.yaw),fz=Math.cos(P.yaw);for(const c of nearCols(P.x,P.z)){const t=c.tree;if(!t||!t.alive)continue;const dx=t.x-P.x,dz=t.z-P.z,d=Math.hypot(dx,dz);if(d>c.r+1.5)continue;if(d>c.r+1.1&&(dx*fx+dz*fz)/d<.2)continue;if(d<bd){bd=d;best=t}}return best}
 function frontRock(){let best=null,bd=1e9;for(const n of nodes){if(n.kind!=='rock'||!n.alive)continue;const d=Math.hypot(n.x-P.x,n.z-P.z);if(d<n.s*1.1+1.4&&d<bd){bd=d;best=n}}return best}
 function busy(){return G.dead||G.over||G.paused||P.st==='sleep'||P.lock>0}
 function attack(){if(busy()||P.atkCd>0)return;if(P.sitFire){P.sitFire=null;G.timeScale=1}const w=WEAPONS[G.weapon];
@@ -204,7 +204,7 @@ function findInteract(){if(G.dead||G.over)return null;let best=null,bd=1e9;const
   for(const n of nodes){if(!n.alive||n.kind==='rock')continue;const d=(n.x-P.x)**2+(n.z-P.z)**2;if(d<(n.kind==='berry'?3.4:2.4)**2)cand(d,{stick:'捡树枝',pebble:'捡石子',herb:'采灵草',berry:'摘浆果'}[n.kind],()=>pick(n),n)}
   for(const a of ACT){if(!a.dead||!a.loot)continue;const d=(a.x-P.x)**2+(a.z-P.z)**2;if(d<2.8**2)cand(d,'剥取'+a.name,()=>{a.loot=false;const l={meat:a.def.meat};if(a.def.hide)l.hide=a.def.hide;give(l);play(P.model,'gather',.7);toast('得到 '+fmtCost(l));a.deadT=999},a)}
   for(const b of G.builds){const d=(b.x-P.x)**2+(b.z-P.z)**2;
-    if(b.t==='fire'&&d<3.2**2){if((G.inv.meat||0)>0)cand(d-.1,'烤肉×'+G.inv.meat,()=>{P.lock=1.3;P.st='kneel';P.yaw=Math.atan2(b.x-P.x,b.z-P.z);later(1.2,()=>{const n=G.inv.meat;G.inv.meat=0;give({cooked:n});toast('烤好了 烤肉+'+n);G.flags.cook=1;gainXP(3)})});else cand(d,'坐下烤火',()=>{P.sitFire=b;P.yaw=Math.atan2(b.x-P.x,b.z-P.z);G.timeScale=6;toast('坐在火边歇息：时间流逝加快，体力恢复。动一下就起身')})}
+    if(b.t==='fire'&&d<3.2**2){if((G.inv.meat||0)>0)cand(d-.1,'烤肉×'+G.inv.meat,()=>{P.lock=1.3;P.st='kneel';P.yaw=Math.atan2(b.x-P.x,b.z-P.z);later(1.2,()=>{const n=G.inv.meat;G.inv.meat=0;give({cooked:n});toast('烤好了 烤肉+'+n);G.flags.cook=1;gainXP(3)})},b);else cand(d,'坐下烤火',()=>{P.sitFire=b;P.yaw=Math.atan2(b.x-P.x,b.z-P.z);G.timeScale=6;toast('坐在火边歇息：时间流逝加快，体力恢复。动一下就起身')})}
     if(b.t==='shelter'&&d<3.4**2)cand(d,'睡觉',()=>sleep(b));
     if(b.t==='farm'&&d<3**2){if(b.stage===0)cand(d,(G.inv.seed||0)>0?'播种':'需要种子',()=>{if(!(G.inv.seed>0)){toast('没有种子：摘浆果有机会得到，或去坊市找商人买');return}G.inv.seed--;b.stage=1;P.lock=1.1;P.st='kneel';toast('种下了！现在需要浇水');G.flags.plant=1});
       else if(b.stage===1)cand(d,G.water>0?'浇水':'需要浇水',()=>{if(!G.tools.canteen){toast('先做一个「水壶」');return}if(G.water<=0){toast('水壶空了：到河边或海边按「互动」打水');return}G.water--;b.stage=2;b.g=0;P.lock=1.2;P.st='pour';burst(b.x,b.obj.position.y+.6,b.z,new THREE.MeshBasicMaterial({color:'#7ac8ff'}),10,1.5);toast('浇好水了，灵谷开始生长');G.flags.water=1});
@@ -371,6 +371,7 @@ async function startGame(fac,origin,sv){G.starting=true;try{await grokPreload()}
   const glb=await idbGet('hero_glb');if(glb&&glb.buf){try{await useGLB(glb.buf,glb.flip,true)}catch(e){toast('自定义模型加载失败，已用默认人物')}}
   else if(!glb&&builtinHero(fac==='A'?'heroA':'heroB')){try{await useGLB(builtinHero(fac==='A'?'heroA':'heroB'),false,true)}catch(e){console.warn(e)}}
   equip(sv&&sv.weapon&&(sv.weapon==='fist'||G.tools[sv.weapon])?sv.weapon:'fist');
+  try{if(CH!==2)placeCampPickups()}catch(e){console.warn('placeCampPickups',e)}
   P.y=groundAt(P.x,P.z);refreshGrass(P.x,P.z);G.started=true;G.raidDay=G.hour>=20?G.day:0;if(!sv)save();
   if(CH===2&&sv&&sv.x==null){save();toast(REGK==='tx'?'你登上了天墟·九州之巅。天道化身就在天宫之中……':'灵舟靠岸，你来到了'+REGD.n+'。'+(G.cleared[REGK]?'这里已经平定。':'这里被「'+bossName()+'」把持，先去'+ZONES.market.name+'打听消息'),1);return}
   toast(sv?'读取存档：第 '+G.day+' 天'+(CH===2?'（第二章 · '+ORIGINS[fac][origin]+'）':''):'你是来自'+ORIGINS[fac][origin]+'的'+FACTION[fac].n+'，流落到中州·灵河界。你在「我方营地」，地上发光的就是树枝和石子，先捡几样吧',1)}

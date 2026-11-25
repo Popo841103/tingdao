@@ -6,23 +6,40 @@ const PICK_C={stick:'#ffb347',pebble:'#9fe0ff',herb:'#7dff8a',berry:'#ff7a9a'};
 const PICK_KINDS=new Set(['stick','pebble','herb','berry']);
 function touchUI(){return isTouch}
 function nearestOf(list,ok){let b=null,bd=1e18;for(const n of list){if(!ok(n))continue;const d=(n.x-P.x)**2+(n.z-P.z)**2;if(d<bd){bd=d;b=n}}return b}
-function nearestNode(kinds){return nearestOf(nodes,n=>n.alive&&kinds.includes(n.kind))}
-function nearestTree(){return nearestOf(trees,t=>t.alive&&TREE_TYPES[t.type]&&TREE_TYPES[t.type].wood>0)}
+/* 安全可达判断：在陆地上、直线走过去不过水、不被帐篷/木箱压住、离营地不远 */
+function dryPath(x0,z0,x1,z1){const d=Math.hypot(x1-x0,z1-z0);for(let k=0;k<=d;k+=1.2){const t=d?k/d:0;if(WATER_Y-groundAt(x0+(x1-x0)*t,z0+(z1-z0)*t)>-.15)return false}return true}
+function freeSpot(x,z,pad){for(const c of nearCols(x,z))if(!c.off&&Math.hypot(c.x-x,c.z-z)<c.r+pad)return false;return true}
+const SAFE_R=38;   // 新手引导只指向营地附近这个范围内的东西
+function safeFor(o,pad){const H0=ZONES.home;return Math.hypot(o.x-H0.x,o.z-H0.z)<SAFE_R&&groundAt(o.x,o.z)>WATER_Y+.5&&dryPath(P.x,P.z,o.x,o.z)&&(pad==null||freeSpot(o.x,o.z,pad))}
+function nearestNode(kinds){const ok=n=>n.alive&&kinds.includes(n.kind);return nearestOf(nodes,n=>ok(n)&&n.home&&dryPath(P.x,P.z,n.x,n.z))||nearestOf(nodes,n=>ok(n)&&safeFor(n,.3))}
+function treeTgt(){const t=nearestTree();return t?ptTgt(t,'树','🌳',(t.col?t.col.r:.6)+1.0):null}
+function nearestTree(){return nearestOf(trees,t=>t.alive&&TREE_TYPES[t.type]&&TREE_TYPES[t.type].wood>0&&safeFor(t))}
+/* 营地的树枝和石子：原来是在营地 ±12 米里随便放，常常压在帐篷、木箱、篝火底下看不见也够不着。
+   开局时把它们挪到营地周围的空地上（固定位置，每次一样；不影响存档，采集物本来就不存档）。 */
+// 在 startGame 里营地和已有建筑都摆好之后调用
+function placeCampPickups(){const H0=ZONES.home;let seed=97;const r01=()=>{seed=(seed*16807)%2147483647;return(seed-1)/2147483646};
+  const spawn={x:H0.x+3,z:H0.z+4},picked=[];const list=nodes.filter(n=>n.home&&(n.kind==='stick'||n.kind==='pebble'));
+  const good=(x,z)=>{const y=groundAt(x,z);if(y<WATER_Y+.8)return false;if(Math.abs(groundAt(x+1,z)-groundAt(x-1,z))+Math.abs(groundAt(x,z+1)-groundAt(x,z-1))>.9)return false;
+    if(!freeSpot(x,z,1.3))return false;if(Math.hypot(x-spawn.x,z-spawn.z)<2.2)return false;for(const p of picked)if(Math.hypot(p.x-x,p.z-z)<1.8)return false;return dryPath(H0.x,H0.z,x,z)};
+  for(const n of list){let ok=false;for(let k=0;k<400&&!ok;k++){const a=r01()*6.283,r=4+r01()*(k<200?8:12),x=spawn.x+Math.cos(a)*r,z=spawn.z+Math.sin(a)*r;if(good(x,z)){ok=true;picked.push({x,z});n.x=x;n.z=z;n.y=groundAt(x,z)+(n.kind==='pebble'?.05:0);const s=n.kind==='pebble'?1.3:1.35;n.m=M4(n.x,n.y,n.z,r01()*6.28,s,s,s);if(n.alive)setNode(n,true)}}
+    if(!ok)n.home=0}}
 function nearestFire(){return nearestOf(G.builds,b=>b.t==='fire')}
-function ptTgt(o,label,icon){return o?{x:o.x,z:o.z,label,icon:icon||'✦',small:true}:null}
+function ptTgt(o,label,icon,nr){return o?{x:o.x,z:o.z,label,icon:icon||'✦',small:true,nr:nr||2.2}:null}
 function zoneTgt(Z,icon){return Z?{x:Z.x,z:Z.z,label:Z.name,icon:icon||'⛺',zone:true,r:Z.r}:null}
 
 /* ----- 第一章任务链：前 6 步是「新手引导」，后面接原来的主线 ----- */
+function inWaterNow(){return WATER_Y-groundAt(P.x,P.z)>.25}
+function homeTgt(lbl){const t=zoneTgt(ZONES.home,'⛺');if(lbl)t.label=lbl;return t}
 function questSteps(){const f=G.flags,i=G.inv,fa=G.faction,T=touchUI(),press=T?'点右下角「互动」':'按 E 键（或点「互动」）';
   const got=()=>G.tools.axe||((i.wood||0)>=2&&(i.stone||0)>=2);
   return [
     {id:'camp',ok:()=>f.camp||got()||f.chop||f.b_fire,t:'前往「我方营地」',act:'跟着屏幕上方的金色箭头走，小地图上有金色虚线。营地有一道金色光柱。',tgt:()=>zoneTgt(ZONES.home,'⛺')},
     {id:'gather',ok:got,t:'在营地附近捡树枝和石子',prog:()=>`木头 ${Math.min(i.wood||0,2)}/2　石头 ${Math.min(i.stone||0,2)}/2`,act:'地上发<span style="color:#e08a10;font-weight:800">橙光</span>的是树枝，发<span style="color:#2a98d0;font-weight:800">蓝光</span>的是石子。走近后'+press+'捡起。',
-      tgt:()=>{const need=[];if((i.wood||0)<2)need.push('stick');if((i.stone||0)<2)need.push('pebble');const n=nearestNode(need.length?need:['stick','pebble']);if(n&&Math.hypot(n.x-ZONES.home.x,n.z-ZONES.home.z)<60)return ptTgt(n,n.name,n.kind==='stick'?'🪵':'🪨');return zoneTgt(ZONES.home,'⛺')}},
+      tgt:()=>{const need=[];if((i.wood||0)<2)need.push('stick');if((i.stone||0)<2)need.push('pebble');const n=nearestNode(need.length?need:['stick','pebble']);if(n)return ptTgt(n,n.name,n.kind==='stick'?'🪵':'🪨');return homeTgt('我方营地（附近找找）')}},
     {id:'axe',ok:()=>G.tools.axe,t:'做一把石斧',act:'点「制造」→「石斧」（木2 石2），做好会自动拿在手上。',hl:'craftB',rec:'axe',tab:'tool'},
-    {id:'chop',ok:()=>f.chop>=2||f.b_fire,t:'砍倒 2 棵树',prog:()=>`已砍倒 ${Math.min(f.chop||0,2)}/2`,act:'走到树旁，'+(T?'点「攻击」':'按 F 键或点「攻击」')+'连砍几下，树倒了就得到木头。',tgt:()=>ptTgt(nearestTree(),'树','🌳')},
+    {id:'chop',ok:()=>f.chop>=2||f.b_fire,t:'砍倒 2 棵树',prog:()=>`已砍倒 ${Math.min(f.chop||0,2)}/2`,act:'走到树旁（箭头消失就是到了），'+(T?'点「攻击」':'按 F 键或点「攻击」')+'连砍几下，树倒了就得到木头。',tgt:()=>treeTgt()},
     {id:'fire',ok:()=>f.b_fire,t:'搭一个篝火',prog:()=>`木头 ${Math.min(i.wood||0,4)}/4　石头 ${Math.min(i.stone||0,3)}/3`,act:'材料够了就点「制造」→「建造」→「篝火」，会建在你面前。',hl:'craftB',rec:'fire',tab:'build',
-      tgt:()=>(i.stone||0)<3?ptTgt(nearestNode(['pebble']),'石子','🪨'):(i.wood||0)<4?ptTgt(nearestTree(),'树','🌳'):null},
+      tgt:()=>(i.stone||0)<3?ptTgt(nearestNode(['pebble']),'石子','🪨'):(i.wood||0)<4?treeTgt():null},
     {id:'cook',ok:()=>f.cook||f.harvest,t:'在篝火边烤肉',act:(i.meat||0)>0?'带着生肉走到篝火旁，'+press+'「烤肉」。':'先打猎（兔、鹿、野猪）得到生肉，再到篝火旁烤。',
       tgt:()=>(i.meat||0)>0?ptTgt(nearestFire(),'篝火','🔥'):ptTgt(nearestOf(ACT,a=>!a.dead&&a.def&&a.def.flee&&!a.human),'猎物','🦌')},
     {id:'shelter',ok:()=>f.b_shelter,t:'搭一个「庇护所」（木12），天黑后去睡觉'},
@@ -58,7 +75,7 @@ function guideDom(){if(GUIDE.wpEl)return;const h=el('hud');
   GUIDE.doneEl=document.createElement('div');GUIDE.doneEl.id='qdone';h.appendChild(GUIDE.doneEl)}
 function updGuide(dt,t){guideDom();const tg=GUIDE.tgt,wp=GUIDE.wpEl;
   // 指路箭头（相对镜头方向）
-  if(tg&&!G.dead&&!G.over){const dx=tg.x-P.x,dz=tg.z-P.z,d=Math.hypot(dx,dz);const near=tg.zone?d<(tg.r||10)*.6:d<2.2;
+  if(tg&&!G.dead&&!G.over){const dx=tg.x-P.x,dz=tg.z-P.z,d=Math.hypot(dx,dz);const near=tg.zone?d<(tg.r||10)*.6:d<tg.nr;
     if(near){wp.style.display='none'}else{wp.style.display='';const fx=-Math.sin(CAM.yaw),fz=-Math.cos(CAM.yaw),rx=Math.cos(CAM.yaw),rz=-Math.sin(CAM.yaw);const a=Math.atan2(dx*rx+dz*rz,dx*fx+dz*fz);
       wp.firstChild.style.transform=`rotate(${a-Math.PI/2}rad)`;wp.lastChild.textContent=`${tg.icon} ${tg.label} · ${Math.round(d)} 米`}
     beam.visible=!!tg.zone&&d>8;if(beam.visible){beam.position.set(tg.x,groundAt(tg.x,tg.z),tg.z);beam.userData.c.material.opacity=.22+.08*Math.sin(t*2.5);const s=1+.08*Math.sin(t*3);beam.userData.r.scale.set(s,1,s)}}
@@ -83,6 +100,9 @@ function guideTick(){const q=CH===2?quest2():questFull();
     gainXP(40);const prev=st?st[G._qn-1]:null;showDone(prev?prev.t:'目标完成',['经验 +40'].concat(got).join('　'),q.t);save()}
   G._qn=q.n;G._qid=q.id;GUIDE.step=q;
   try{GUIDE.tgt=q.tgt?q.tgt():null}catch(e){GUIDE.tgt=null}
+  // 新手阶段走进水里：箭头先指回营地，并提醒一次（游泳耗体力，体力没了会掉血）
+  if(CH!==2&&q.n<=TUT_N){const wet=inWaterNow();if(wet){GUIDE.tgt=homeTgt('回岸上 · 我方营地');if(!GUIDE.wetWarn){GUIDE.wetWarn=true;toast('你走进水里了！游泳很耗体力，体力用完会掉血。跟着箭头回营地，树枝和石子都在营地旁边的空地上',1)}}else if(GUIDE.wetWarn&&!wet)GUIDE.wetWarn=false;
+    if(!wet&&GUIDE.tgt&&GUIDE.tgt.small&&Math.hypot(P.x-ZONES.home.x,P.z-ZONES.home.z)>SAFE_R+6)GUIDE.tgt=homeTgt('先回营地')}
   if(CH===2&&!GUIDE.tgt){const k=q.n;GUIDE.tgt=k===1?(G.merchant?{x:G.merchant.x,z:G.merchant.z,label:'商人',icon:'🏮',zone:true,r:6}:null):k===2&&CH2OBJ.chest?{x:CH2OBJ.chest.x,z:CH2OBJ.chest.z,label:'秘境宝箱',icon:'🎁',zone:true,r:8}:k===3?zoneTgt(ZONES.enemy,'⚔'):k===4?zoneTgt(ZONES.river,'⚓'):null}
   const tut=CH!==2&&q.n<=TUT_N,rew=CH!==2&&TUT_REW[q.id]&&!rw[q.id]?fmtCost(TUT_REW[q.id]):'';
   el('quest').innerHTML=`<b>${tut?'新手引导 '+q.n+'/'+TUT_N:'目标 '+q.n+'/'+q.all}</b>${q.t}`+(q.prog?`<div class="qp">${q.prog()}</div>`:'')+(q.act?`<div class="qa">👉 ${q.act}</div>`:'')+(rew?`<div class="qr">🎁 奖励：${rew}　经验 +40</div>`:'');

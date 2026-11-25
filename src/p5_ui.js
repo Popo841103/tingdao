@@ -209,7 +209,8 @@ function updDyn(dt,t){
 /* ---------- 主循环 ---------- */
 const clock=new THREE.Clock();let fpsV=60,fpsN=0,fpsT=0,simT=0;
 function resize(){const w=innerWidth,h=innerHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix()}addEventListener('resize',resize);resize();
-function frame(){requestAnimationFrame(frame);let dt=Math.min(clock.getDelta(),.05);fpsN++;fpsT+=dt;if(fpsT>.5){fpsV=fpsN/fpsT;fpsN=0;fpsT=0}
+function frame(){requestAnimationFrame(frame);const rawDt=clock.getDelta();let dt=Math.min(rawDt,.05);fpsN++;fpsT+=rawDt;   // 帧率按真实时间算（以前用截断后的 dt，低于 20 帧时也会显示 20）
+  if(fpsT>.5){fpsV=fpsN/fpsT;fpsN=0;fpsT=0}
   if(!G.started){CAM.yaw+=dt*.05;const t=performance.now()/1000;if(!G.starting){P.x=ZONES.market.x;P.z=ZONES.market.z}P.y=groundAt(P.x,P.z);updSky(0);updCam(dt);WU.uTime.value=t;GU.uTime.value=t;renderer.render(scene,camera);return}
   const run=!G.paused;simT+=run?dt:0;
   if(run){keyMove();if(atkHold)attack();

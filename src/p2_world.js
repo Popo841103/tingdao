@@ -108,10 +108,10 @@ bushList.forEach((b,i)=>nodes.push(Object.assign(b,{kind:'berry',name:'浆果丛
 // 地上的树枝和石子（开局好上手）
 const stickGeo=merged([0,1,2].map(k=>[new THREE.CylinderGeometry(.04,.05,1,5),M4(0,.06+k*.05,0,k*1.1,1,1,1,0,Math.PI/2)]));
 const stickList=scatter(70,(x,z,y)=>y>1.2&&y<10&&!['market','enemy'].includes(zoneOf(x,z)));
-for(let i=0;i<6;i++)stickList.push({x:ZONES.home.x+rnd(-12,12),z:ZONES.home.z+rnd(-12,12),y:0});stickList.forEach(p=>{p.y=H(p.x,p.z);p.s=1.35});
+for(let i=0;i<6;i++)stickList.push({x:ZONES.home.x+rnd(-12,12),z:ZONES.home.z+rnd(-12,12),y:0,home:1});   // 营地这几根会在 p7 里挪到安全空地stickList.forEach(p=>{p.y=H(p.x,p.z);p.s=1.35});
 const stickIM=makeIM(stickGeo,MAT.stick,stickList);stickList.forEach((p,i)=>nodes.push(Object.assign(p,{kind:'stick',name:'树枝',i,im:stickIM,alive:true,t:0})));
 const pebList=scatter(55,(x,z,y)=>y>.8&&y<14&&!['market','enemy'].includes(zoneOf(x,z)));
-for(let i=0;i<5;i++)pebList.push({x:ZONES.home.x+rnd(-12,12),z:ZONES.home.z+rnd(-12,12),y:0});pebList.forEach(p=>{p.y=H(p.x,p.z)+.05;p.s=1.3});
+for(let i=0;i<5;i++)pebList.push({x:ZONES.home.x+rnd(-12,12),z:ZONES.home.z+rnd(-12,12),y:0,home:1});pebList.forEach(p=>{p.y=H(p.x,p.z)+.05;p.s=1.3});
 const pebIM=makeIM(merged([[new THREE.DodecahedronGeometry(.16,0),M4(0,.08,0,0,1,.6,1)],[new THREE.DodecahedronGeometry(.11,0),M4(.18,.05,.1,0,1,.6,1)]]),MAT.pebble,pebList);
 pebList.forEach((p,i)=>nodes.push(Object.assign(p,{kind:'pebble',name:'石子',i,im:pebIM,alive:true,t:0})));
 function setNode(n,vis){n.im.setMatrixAt(n.i,vis?n.m:ZERO);n.im.instanceMatrix.needsUpdate=true;if(n.im2){n.im2.setMatrixAt(n.i,vis?n.m:ZERO);n.im2.instanceMatrix.needsUpdate=true}if(n.col&&n.kind==='rock')n.col.off=!vis}
