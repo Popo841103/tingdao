@@ -204,6 +204,8 @@ function findInteract(){if(G.dead||G.over)return null;let best=null,bd=1e9;const
   for(const n of nodes){if(!n.alive||n.kind==='rock')continue;const d=(n.x-P.x)**2+(n.z-P.z)**2;if(d<(n.kind==='berry'?3.4:2.4)**2)cand(d,{stick:'捡树枝',pebble:'捡石子',herb:'采灵草',berry:'摘浆果'}[n.kind],()=>pick(n),n)}
   for(const a of ACT){if(!a.dead||!a.loot)continue;const d=(a.x-P.x)**2+(a.z-P.z)**2;if(d<2.8**2)cand(d,'剥取'+a.name,()=>{a.loot=false;const l={meat:a.def.meat};if(a.def.hide)l.hide=a.def.hide;give(l);play(P.model,'gather',.7);toast('得到 '+fmtCost(l));a.deadT=999},a)}
   for(const b of G.builds){const d=(b.x-P.x)**2+(b.z-P.z)**2;
+    if(b.t==='fire'&&b.out){relightCand(b,d,cand);continue}
+    if(b.t==='fire'&&d<3.2**2&&vigilActive()&&b.flame!=null&&b.flame<85&&(G.inv.wood||0)>0&&P.sitFire!==b)cand(d-.2,'添柴 · 火势 '+Math.round(b.flame)+'%',()=>{take({wood:1});b.flame=Math.min(100,b.flame+40);play(P.model,'gather',.5);P.lock=.4;burst(b.x,b.obj.position.y+.8,b.z,MAT.flame,5,1.4)},b);
     if(b.t==='fire'&&d<3.2**2){if((G.inv.meat||0)>0)cand(d-.1,'烤肉×'+G.inv.meat,()=>{P.lock=1.3;P.st='kneel';P.yaw=Math.atan2(b.x-P.x,b.z-P.z);later(1.2,()=>{const n=G.inv.meat;G.inv.meat=0;give({cooked:n});toast('烤好了 烤肉+'+n);G.flags.cook=1;gainXP(3)})},b);else cand(d,'坐下烤火',()=>{P.sitFire=b;P.yaw=Math.atan2(b.x-P.x,b.z-P.z);G.timeScale=6;toast('坐在火边歇息：时间流逝加快，体力恢复。动一下就起身')})}
     if(b.t==='shelter'&&d<3.4**2)cand(d,'睡觉',()=>sleep(b));
     if(b.t==='farm'&&d<3**2){if(b.stage===0)cand(d,(G.inv.seed||0)>0?'播种':'需要种子',()=>{if(!(G.inv.seed>0)){toast('没有种子：摘浆果有机会得到，或去坊市找商人买');return}G.inv.seed--;b.stage=1;P.lock=1.1;P.st='kneel';toast('种下了！现在需要浇水');G.flags.plant=1});
@@ -215,7 +217,7 @@ function findInteract(){if(G.dead||G.over)return null;let best=null,bd=1e9;const
     if(fu){const d=(fu.x-P.x)**2+(fu.z-P.z)**2;if(d<3.2**2)cand(d,A?'丹炉：炼聚气丹':'改造台：灵能充能',()=>brewPill())}
     if(cs&&!G.flags.chest){const d=(cs.x-P.x)**2+(cs.z-P.z)**2;if(d<3**2)cand(d,ACT.some(a=>a.guard2&&!a.dead)?'先打败守山灵兽':'打开秘境宝箱',()=>openChest())}}
   extraInteract(cand);
-  if(G.merchant){const d=(G.merchant.x-P.x)**2+(G.merchant.z-P.z)**2;if(d<3.5**2)cand(d,'和商人交易',()=>{G.flags.merchant=1;ui.trade()},G.merchant)}
+  if(G.merchant){const d=(G.merchant.x-P.x)**2+(G.merchant.z-P.z)**2;if(d<3.5**2)cand(d,CH!==2?'和摊主说话':'和商人交易',()=>storyMerchant(),G.merchant)}
   if(!best&&G.tools.canteen&&G.water<3&&nearWater())best={label:'打水',fn:()=>{G.water=3;play(P.model,'gather',.7);toast('水壶装满了（可浇 3 次）')}};
   return best}
 function pick(n){n.alive=false;setNode(n,false);gainXP(n.kind==='herb'?2:1);play(P.model,'gather',.6);P.lock=.45;let l;
@@ -374,7 +376,7 @@ async function startGame(fac,origin,sv){G.starting=true;try{await grokPreload()}
   try{if(CH!==2)placeCampPickups()}catch(e){console.warn('placeCampPickups',e)}
   P.y=groundAt(P.x,P.z);refreshGrass(P.x,P.z);G.started=true;G.raidDay=G.hour>=20?G.day:0;if(!sv)save();
   if(CH===2&&sv&&sv.x==null){save();toast(REGK==='tx'?'你登上了天墟·九州之巅。天道化身就在天宫之中……':'灵舟靠岸，你来到了'+REGD.n+'。'+(G.cleared[REGK]?'这里已经平定。':'这里被「'+bossName()+'」把持，先去'+ZONES.market.name+'打听消息'),1);return}
-  toast(sv?'读取存档：第 '+G.day+' 天'+(CH===2?'（第二章 · '+ORIGINS[fac][origin]+'）':''):'你是来自'+ORIGINS[fac][origin]+'的'+FACTION[fac].n+'，流落到中州·灵河界。你在「我方营地」，地上发光的就是树枝和石子，先捡几样吧',1)}
+  toast(sv?'读取存档：第 '+G.day+' 天'+(CH===2?'（第二章 · '+ORIGINS[fac][origin]+'）':''):'你是来自'+ORIGINS[fac][origin]+'的'+FACTION[fac].n+'，流落到中州·灵河界。',1)}
 async function useGLB(buf,flip,quiet){const w=await buildGLBHero(buf.slice(0),flip);const old=P.model;if(old){scene.remove(old)}P.model=w;scene.add(w);P.glider=mkGlider();w.add(P.glider);
   if(w.rig){w.rig.propKey=null;setProp(w,WEAPONS[G.weapon].prop);if(!quiet)toast('模型已替换：它没有自带骨骼和动作，已自动绑骨，用游戏内置动作驱动',1);return{names:['（没有自带动作：已自动绑骨，用内置的走、跑、跳、游泳、滑翔、攻击、坐、睡动作）'],acts:{}}}
   if(G.started||quiet)attachGLBProp(WEAPONS[G.weapon].prop);const g=w.glb;const miss=['idle','walk','run','jump','swim','glide','attack'].filter(k=>!g.acts[k]);

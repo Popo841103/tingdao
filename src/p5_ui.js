@@ -7,7 +7,7 @@ let toastT=0;ui.toast=(t,long)=>{const e=el('toast');e.textContent=t;e.classList
 const BARS=['hp','hunger','sta','mana'];
 ui.refresh=()=>{el('wpn').textContent=WEAPONS[G.weapon].n};
 ui.bossBar=a=>{const b=el('boss');if(!a){b.style.display='none';return}b.style.display='block';el('bossN').textContent=a.name;el('bossF').style.width=(a.hp/a.maxhp*100)+'%'};
-function panel(id,on){el(id).classList.toggle('on',on);G.paused=['craft','trade','map9','set','bigmap','stat','pets','route'].some(k=>el(k).classList.contains('on'))}
+function panel(id,on){el(id).classList.toggle('on',on);G.paused=['craft','trade','map9','set','bigmap','stat','pets','route','story'].some(k=>el(k).classList.contains('on'))}
 document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>panel(b.dataset.close,false));
 
 /* ---------- 开始界面 ---------- */
@@ -193,10 +193,10 @@ function updDyn(dt,t){
   rain.visible=G.rainK>.05;rain.material.opacity=.5*G.rainK;if(rain.visible){const a=rain.geometry.attributes.position.array;for(let i=0;i<RAIN_N;i++){const r=rainS[i];r[1]-=dt*26;if(r[1]<-2){r[1]=rnd(14,22);r[0]=rnd(-25,25);r[2]=rnd(-25,25)}
     const x=P.x+r[0],y=P.y+r[1],z=P.z+r[2];a.set([x,y,z,x+.08,y+.7,z],i*6)}rain.geometry.attributes.position.needsUpdate=true}
   // 篝火
-  let nf=null,nd=1e9;for(const b of G.builds){if(b.t==='fire'){const fl=b.obj.userData.flame;const k=1+Math.sin(t*13+b.x)*.12+Math.sin(t*23)*.08;fl.scale.set(1+Math.sin(t*9)*.08,k,1+Math.cos(t*11)*.08);fl.rotation.y=t*2;
-      const d=dist2(b);if(d<nd){nd=d;nf=b}if(Math.random()<dt*6)burst(b.x+rnd(-.2,.2),b.obj.position.y+.9,b.z+rnd(-.2,.2),MAT.flame,1,.3)}if(b.t==='farm')updFarm(b,dt*G.timeScale);
+  let nf=null,nd=1e9;for(const b of G.builds){if(b.t==='fire'){const fl=b.obj.userData.flame;const k=1+Math.sin(t*13+b.x)*.12+Math.sin(t*23)*.08;const fk=fireK(b);fl.visible=fk>0;fl.scale.set((1+Math.sin(t*9)*.08)*fk,k*fk,(1+Math.cos(t*11)*.08)*fk);fl.rotation.y=t*2;
+      if(b.out)continue;const d=dist2(b);if(d<nd){nd=d;nf=b}if(Math.random()<dt*6*fk)burst(b.x+rnd(-.2,.2),b.obj.position.y+.9,b.z+rnd(-.2,.2),MAT.flame,1,.3)}if(b.t==='farm')updFarm(b,dt*G.timeScale);
     if(b.t==='boat'){b.obj.position.y=WATER_Y+.25+Math.sin(t*1.3)*.12;b.obj.rotation.z=Math.sin(t*.9)*.03;const s=b.obj.userData.sail;s.scale.z=1}}
-  const {day}=dayK();if(nf&&nd<1600){fireLight.position.set(nf.x,nf.obj.position.y+1.2,nf.z);fireLight.intensity=(4+Math.sin(t*15)*.6+Math.sin(t*7)*.5)*(1.4-day)*6}else fireLight.intensity=0;
+  const {day}=dayK();if(nf&&nd<1600){fireLight.position.set(nf.x,nf.obj.position.y+1.2,nf.z);fireLight.intensity=(4+Math.sin(t*15)*.6+Math.sin(t*7)*.5)*(1.4-day)*6*fireK(nf)}else fireLight.intensity=0;
   for(const b of DECOR_BOATS){b.position.y=WATER_Y+.2+Math.sin(t*1.1+b.position.x)*.1;b.rotation.z=Math.sin(t*.8)*.04}
   for(const c of CRANES){c.a+=dt*c.sp;const x=c.cx+Math.cos(c.a)*c.r,z=c.cz+Math.sin(c.a)*c.r;c.g.position.set(x,c.y+Math.sin(t*.7+c.r)*2,z);c.g.rotation.y=Math.atan2(-Math.sin(c.a)*Math.sign(c.sp),Math.cos(c.a)*Math.sign(c.sp));const f=Math.sin(t*5+c.r)*.55;c.ws[0].rotation.z=-f;c.ws[1].rotation.z=f}
   if(CH2OBJ.furnace){const fr=CH2OBJ.furnace.fire;fr.scale.set(1,1+Math.sin(t*12)*.2,1)}if(CH2OBJ.chest&&CH2OBJ.chest.glow.visible){CH2OBJ.chest.glow.rotation.y=t*1.5;CH2OBJ.chest.glow.position.y=1.5+Math.sin(t*2)*.12}
@@ -227,4 +227,4 @@ function frame(){requestAnimationFrame(frame);const rawDt=clock.getDelta();let d
     G.played+=dt;if(G.played>90){G.played=0;if(!G.dead&&!G.over)save()}}
   updSky(dt);updDyn(dt,simT);updCam(dt);updFX(dt);updHUD(dt);updGuide(dt,simT);renderer.render(scene,camera)}
 frame();el('loading').style.display='none';el('start').style.display='';
-window.__game={spawnGhost,gainXP,drawStat,G,P,CAM,IN,ACT,nodes,trees,attack,skill,eat,craft,findInteract,startGame,go,save,importGLB,useGLB,renderer,scene,camera,THREE,spawnBeast,hurtActor,ending,equip,ZONES,groundAt,H,WATER_Y,riverX,panel};
+window.__game={nearCols,spawnGhost,gainXP,drawStat,G,P,CAM,IN,ACT,nodes,trees,attack,skill,eat,craft,findInteract,startGame,go,save,importGLB,useGLB,renderer,scene,camera,THREE,spawnBeast,hurtActor,ending,equip,ZONES,groundAt,H,WATER_Y,riverX,panel};

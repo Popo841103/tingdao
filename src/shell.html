@@ -26,6 +26,14 @@ html,body{margin:0;height:100%;overflow:hidden;background:#9fd3ea;font-family:"P
 @media (max-height:480px){#wp{font-size:12.5px;top:calc(40px + env(safe-area-inset-top))}#qdone{top:calc(76px + env(safe-area-inset-top));padding:7px 14px}#qdone .h{font-size:15px}#quest{width:min(340px,44vw)}#quest .qa{font-size:11px}}
 #hud.qdon #toast{bottom:22%}
 @media (max-width:720px){#wp{top:calc(10px + env(safe-area-inset-top))}}
+#story .sc{width:min(420px,92vw);padding:20px 22px 16px;text-align:center;background:linear-gradient(#fffaf0,#f6ead2);border:2px solid #d8b878}
+#stT{font-size:13px;letter-spacing:6px;color:#9a7a4a;margin-bottom:10px}#stL p{margin:7px 0;font-size:16px;line-height:1.55;color:#3a2a18;opacity:0;animation:stIn .6s forwards}#stL b{color:#a0401a}
+@keyframes stIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+#stB{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:14px}#stB button{padding:9px 16px;border-radius:12px;border:none;background:#8a5a20;color:#fff;font-size:15px;font-weight:700}#stB button:disabled{background:#c8b8a0}
+#mem{position:absolute;left:50%;top:36%;transform:translateX(-50%);max-width:min(460px,80vw);text-align:center;font-size:16px;font-style:italic;color:#fff8e6;text-shadow:0 0 6px #000,0 1px 2px #000;opacity:0;pointer-events:none;transition:opacity 1.2s}
+#mem.on{opacity:1;animation:memf 5.2s forwards}@keyframes memf{0%{opacity:0}15%{opacity:1}75%{opacity:1}100%{opacity:0}}
+#quest .mc{float:right;font-size:11px;color:#9a7a4a;font-weight:700;margin-left:8px}
+@media (max-height:480px){#mem{top:47%;font-size:14px}#stL p{font-size:14.5px;margin:5px 0}#story .sc{padding:14px 16px 12px}}
 #start{position:fixed;inset:0;z-index:40;display:flex;align-items:center;justify-content:center;padding:12px;background:linear-gradient(rgba(190,230,248,.35),rgba(255,246,228,.55))}
 #start .box{width:min(760px,100%);max-height:100%;overflow:auto;padding:18px 20px}
 #start h1{margin:0;text-align:center;font-size:38px;letter-spacing:10px;color:#2f6f8a}
@@ -153,7 +161,8 @@ html,body{margin:0;height:100%;overflow:hidden;background:#9fd3ea;font-family:"P
 <div id="joy"><div id="knob"></div></div>
 <div id="fx"></div><div id="hurt"></div><div id="fade"></div>
 <div class="modal" id="craft"><div class="pan"><h2>制造 · 建造<button class="x" data-close="craft">✕</button></h2><div id="ctabs"></div><div class="list" id="clist"></div><div id="cinv"></div></div></div>
-<div class="modal" id="trade"><div class="pan"><h2>坊市商人<button class="x" data-close="trade">✕</button></h2><div class="lore">「客官，灵石换货，童叟无欺。」</div><div class="list" id="tlist"></div><div id="tinv"></div></div></div>
+<div class="modal" id="story"><div class="pan sc"><div id="stT"></div><div id="stL"></div><div id="stB"></div></div></div>
+<div class="modal" id="trade"><div class="pan"><h2>坊市商人<button class="x" data-close="trade">✕</button></h2><div class="lore">「此岸的东西，都有灵价。」</div><div class="list" id="tlist"></div><div id="tinv"></div></div></div>
 <div class="modal" id="map9"><div class="pan"><h2>九洲图<button class="x" data-close="map9">✕</button></h2><div id="nine"></div>
   <div class="lore">天下分为九大洲。<b>中州</b>居中，势力最强，灵河界就在中州。<br><b>上四州</b>（上云州、上玄州、上天州、上仙州）由原生修士掌控；<b>下四州</b>（下云州、下玄州、下天州、下仙州）由穿越者掌控。<br>出身加成：云＝体力　玄＝攻击　天＝生命　仙＝耐饿</div></div></div>
 <div class="modal" id="bigmap"><div class="pan" style="width:min(720px,100%)"><h2>灵河界地图<button class="x" data-close="bigmap">✕</button></h2><canvas id="bm"></canvas><div class="lore">黄色箭头是你。红点是敌人和野兽（红色大点是首领），橙圆是篝火，方块是你建的庇护所和田，金点是坊市商人。</div></div></div>
