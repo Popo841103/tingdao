@@ -42,6 +42,14 @@ npx @gltf-transform/cli@4.1.1 inspect 输出.glb
 - 减面达不到目标时，把 `--error` 调大（如 0.02、0.05），代价是细节变少。
 - **不要**加 `--texture-compress webp`，原因见上面第 0 节。
 
+### 混元高模的实际处理经验（2026-11 第一批模型）
+- 混元模型贴图接缝极多，普通 `simplify` 只能降到 6–8 万面。第一批是用 meshoptimizer 1.3 的
+  `simplifyWithAttributes(... ['Permissive'])`（允许跨 UV 接缝减面，UV 权重 0.5）降到目标面数的，贴图效果良好。
+- 混元自带 3 张 4096 PNG（颜色 / 金属粗糙度 / 法线），已去掉金属粗糙度贴图，其余压成 1024 JPG。
+- 动物模型要预先：缩放到真实高度（鹿 1.6、兔 0.6）、脚底贴 y=0、头朝 +Z，并把节点变换**烘焙进顶点**，
+  让网格直接挂在场景根下（`grokBeast()` 只认根下的网格，多套一层节点会导致不显示）。
+- 自动绑骨已支持「双手下垂」的站姿，以及 gltf-transform 输出的「交错顶点」格式（以前会让人物变成一团尖刺）。
+
 ## 3. 各类模型放哪里、怎么接进游戏
 
 所有模型都放在 `assets/models/`。
@@ -63,8 +71,7 @@ npx @gltf-transform/cli@4.1.1 inspect 输出.glb
 ### 现在还是「方块拼的」、最值得换的
 | 对象 | 现在的实现 | 要改的地方 |
 |---|---|---|
-| 鹿 `deer`、兔 `rabbit` | `makeBeast()` 用方块拼 | 放入 `assets/models/deer.glb`、`rabbit.glb`，把 `'deer','rabbit'` 加进 `GROK_KEYS`。`makeBeast()` 已经会优先用 `GROKM[kind]` |
-| 坊市商人 | `makeHuman('merchant')` | `src/p4_game.js` 里生成商人的地方，改成 `grokHuman('merchant')`（先把 `merchant` 加进 `GROK_KEYS`，并保留 `makeHuman` 作为加载失败时的后备） |
+| ~~鹿、兔、坊市商人~~ | 已换成混元模型（`deer.glb`、`rabbit.glb`、`merchant.glb`） | — |
 | 营地帐篷、木箱 | 程序几何体 | 在 `src/p2_world.js` 的营地搭建代码里替换，工作量较大 |
 
 ### 新增模型（例如一条龙在天上盘旋）

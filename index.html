@@ -948,8 +948,8 @@ function play(h,k,d){h.act={k,t:0,d}}
 const BEASTS={
   boar:{name:'野猪',hp:70,dmg:12,speed:5.2,r:.7,body:'#6a4630',belly:'#7e5a42',size:[.55,.5,1],head:.32,leg:.38,tusk:1,meat:2,hide:1,aggro:9,day:1},
   wolf:{name:'灵狼',hp:55,dmg:10,speed:6.6,r:.6,body:'#7078d8',belly:'#a8b0f0',glow:1,size:[.42,.42,.95],head:.28,leg:.5,ears:1,meat:1,hide:1,aggro:16,night:1},
-  deer:{name:'鹿',hp:26,dmg:0,speed:7.2,r:.6,body:'#a8784a',belly:'#e8d2b0',size:[.42,.45,.9],head:.24,leg:.7,antler:1,meat:3,hide:1,flee:1,day:1},
-  rabbit:{name:'野兔',hp:10,dmg:0,speed:6.5,r:.3,body:'#b8a08a',belly:'#f0e6d8',size:[.2,.2,.3],head:.13,leg:.14,ears:2,meat:1,hide:0,flee:1,day:1}};
+  deer:{name:'灵鹿',hp:26,dmg:0,speed:7.2,r:.6,body:'#a8784a',belly:'#e8d2b0',size:[.42,.45,.9],head:.24,leg:.7,antler:1,meat:3,hide:1,flee:1,day:1},
+  rabbit:{name:'灵兔',hp:10,dmg:0,speed:6.5,r:.3,body:'#b8a08a',belly:'#f0e6d8',size:[.2,.2,.3],head:.13,leg:.14,ears:2,meat:1,hide:0,flee:1,day:1}};
 if(CH===2&&REGD.beast)for(const k in REGD.beast){const c=REGD.beast[k];BEASTS[k].body=c[0];BEASTS[k].belly=c[1];if(c[2])BEASTS[k].glowC=c[2]}
 if(CH===2){const WN={snow:'雪原白狼',desert:'沙漠狼',volcano:'熔岩狼',swamp:'沼泽狼',city:'机械狼',sky:'天狼'}[REGD.terr];if(WN)BEASTS.wolf.name=WN}
 function makeBeast(kind){if(GROKM[kind]){const g=grokBeast(kind);if(g)return g}const B_=BEASTS[kind],root=new THREE.Group(),body=new THREE.Group();root.add(body);const [w,hh,l]=B_.size,L=B_.leg;
@@ -974,7 +974,7 @@ function animBeast(b,sp,dt,st){const r=b.beast;b.phase+=dt*(sp>.1?sp*2.2:1.2);co
 
 /* ---------- Grok 生成的模型：敌兵、首领、狼、野猪 ---------- */
 const GROKM={};
-const GROK_KEYS=['viking','boy','xianxia','wolf','boar','youhun'];
+const GROK_KEYS=['viking','boy','xianxia','wolf','boar','youhun','deer','rabbit','merchant'];
 async function grokPreload(){await Promise.all(GROK_KEYS.map(async k=>{if(GROKM[k])return;try{const r=await fetch('assets/models/'+k+'.glb');if(!r.ok)throw new Error(r.status);GROKM[k]=await parseGLB(await r.arrayBuffer())}catch(e){console.warn('grok',k,e)}}))}
 function grokHuman(k,scale=1){const gl=GROKM[k];if(!gl)return null;const w=glbWrap(gl,false,true);w.scale.setScalar(scale);w.grok=k;return w}
 const GB_MAT={};
@@ -1007,6 +1007,10 @@ function rigLayout(P){ // P: Float32Array xyz（归一化）
     if(y<.08){const s=x<0?0:1;lx[s]+=x;ln[s]++}}
   const L={hip:.47,knee:.25,waist:.55,neck:.84,sY:.775,sX:.1,legL:ln[0]?lx[0]/ln[0]:-.06,legR:ln[1]?lx[1]/ln[1]:.06};
   L.handL=hL||[-.3,.6,0];L.handR=hR||[.3,.6,0];
+  // 双手自然下垂的模型（混元等常见）：肩膀高度两侧没有手臂。这时按「手垂在身体两侧」绑骨，
+  // 否则会把袖子、手里的剑当成伸出去的手，做动作时把衣服甩成尖刺
+  {let side=0,band=0;for(let i=0;i<n;i++){const y=P[i*3+1];if(y>.6&&y<.8){band++;if(Math.abs(P[i*3])>.27)side++}}
+   L.down=band>0&&side/band<.01;if(L.down){L.handL=[-.17,.47,0];L.handR=[.17,.47,0]}}
   // 手太低（双手下垂）时肩膀到手的方向接近竖直，也能工作
   return L}
 const RIG_BONES=['body','pel','tor','hd','uaL','faL','handL','uaR','faR','handR','thL','shL','thR','shR'];
@@ -1029,7 +1033,7 @@ function shrinkTex(m){const lim=isTouch?512:1024;for(const k of['map','normalMap
   const c=document.createElement('canvas');c.width=c.height=lim;c.getContext('2d').drawImage(im,0,0,lim,lim);t.image=c;t.needsUpdate=true}}
 // 没有骨骼和动作的静态模型：自动绑上 14 根骨骼，然后用内置的程序动作驱动（走、跑、跳、游泳、滑翔、攻击、坐、睡）
 function autoRigHero(model,flip){model.updateMatrixWorld(true);const meshes=[];model.traverse(o=>{if(o.isMesh)meshes.push(o)});
-  const geos=meshes.map(m=>{const g=m.geometry.clone();g.applyMatrix4(m.matrixWorld);for(const k of Object.keys(g.attributes))if(!['position','normal','uv'].includes(k))g.deleteAttribute(k);return g});
+  const geos=meshes.map(m=>{const g=m.geometry.clone();for(const k of Object.keys(g.attributes)){const at=g.attributes[k];if(!['position','normal','uv'].includes(k)){g.deleteAttribute(k);continue}if(at.isInterleavedBufferAttribute)g.setAttribute(k,at.clone())}g.applyMatrix4(m.matrixWorld);return g});
   const box=new THREE.Box3();geos.forEach(g=>{g.computeBoundingBox();box.union(g.boundingBox)});const K=1.8,S=K/Math.max(.001,box.max.y-box.min.y);
   const nm=new THREE.Matrix4().makeScale(S,S,S).multiply(new THREE.Matrix4().makeTranslation(-(box.min.x+box.max.x)/2,-box.min.y,-(box.min.z+box.max.z)/2));if(flip)nm.premultiply(new THREE.Matrix4().makeRotationY(Math.PI));
   geos.forEach(g=>g.applyMatrix4(nm));let tot=0;geos.forEach(g=>tot+=g.attributes.position.array.length);const PA=new Float32Array(tot);{let o=0;geos.forEach(g=>{const a=g.attributes.position.array;for(let i=0;i<a.length;i++)PA[o++]=a[i]/K})}
@@ -1206,7 +1210,7 @@ function populate(){
   for(let i=0;i<2;i++)spawnSoldier(Z.x+2,Z.z-4+i*8,{guard:1});
   if(!G.bossDead)spawnBoss();
   // 坊市商人
-  const m=makeHuman('merchant');const Mx=ZONES.market.x-4,Mz=ZONES.market.z+1.4;m.position.set(Mx,groundAt(Mx,Mz),Mz);m.rotation.y=0;scene.add(m);G.merchant={obj:m,x:Mx,z:Mz};
+  const m=grokHuman('merchant')||makeHuman('merchant');const Mx=ZONES.market.x-4,Mz=ZONES.market.z+1.4;m.position.set(Mx,groundAt(Mx,Mz),Mz);m.rotation.y=0;scene.add(m);G.merchant={obj:m,x:Mx,z:Mz};
 }
 
 /* ---------- 伤害 ---------- */

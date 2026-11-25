@@ -131,7 +131,7 @@ function populate(){
   for(let i=0;i<2;i++)spawnSoldier(Z.x+2,Z.z-4+i*8,{guard:1});
   if(!G.bossDead)spawnBoss();
   // 坊市商人
-  const m=makeHuman('merchant');const Mx=ZONES.market.x-4,Mz=ZONES.market.z+1.4;m.position.set(Mx,groundAt(Mx,Mz),Mz);m.rotation.y=0;scene.add(m);G.merchant={obj:m,x:Mx,z:Mz};
+  const m=grokHuman('merchant')||makeHuman('merchant');const Mx=ZONES.market.x-4,Mz=ZONES.market.z+1.4;m.position.set(Mx,groundAt(Mx,Mz),Mz);m.rotation.y=0;scene.add(m);G.merchant={obj:m,x:Mx,z:Mz};
 }
 
 /* ---------- 伤害 ---------- */
