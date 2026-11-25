@@ -8,7 +8,7 @@ FILES=['p1_core.js','p8_audio.js','p2_world.js','p3_actors.js','p4_game.js','p6_
 ASSETS=['nat_assets.js','mkt_assets.js','fangshi_assets.js','tex_assets.js','gtree_assets.js']
 s=open('shell.html',encoding='utf8').read().replace("if(m&&!window.GAME_OK)m.textContent","if(m&&document.getElementById('loading').style.display!=='none')m.textContent")
 code="\n".join(open(f,encoding='utf8').read() for f in FILES)
-tags="".join('<script src="assets/%s"></script>\n'%a for a in ASSETS)
+tags='<script>window.__ldT=%d</script>\n'%(len(ASSETS)+1)+"".join('<script src="assets/%s" onload="__ld()"></script>\n'%a for a in ASSETS)
 s=s.replace('<script type="module">',tags+'<script type="module">',1)
 open('../index.html','w',encoding='utf8').write(s.replace('/*__CODE__*/',code))
 print('wrote ../index.html')

@@ -133,7 +133,8 @@ body.inpro #quest,body.inpro #wp,body.inpro #ip,body.inpro #qdone,body.inpro #in
 #achPop.on{animation:achIn 4s forwards}@keyframes achIn{0%{opacity:0;transform:translate(-50%,-20px)}10%,82%{opacity:1;transform:translate(-50%,0)}100%{opacity:0;transform:translate(-50%,-20px)}}
 </style></head><body>
 <div id="rot"><b>📱</b>请把手机横过来玩<br><span style="font-size:14px;opacity:.75">（如果转不过来：打开手机的「自动旋转」，关掉「竖屏锁定」）</span></div><canvas id="c"></canvas>
-<div id="loading"><b>听道</b><div>正在加载 3D 引擎…</div><div id="lmsg" style="font-size:13px;color:#8a7a60"></div></div>
+<div id="loading"><b>听道</b><div id="ltxt">正在加载游戏素材…</div><div id="lbar" style="width:min(320px,70vw);height:10px;border-radius:6px;background:rgba(0,0,0,.12);overflow:hidden"><i style="display:block;height:100%;width:3%;background:linear-gradient(90deg,#4aa8d0,#7ad0f0);transition:width .3s"></i></div><div id="lmsg" style="font-size:13px;color:#8a7a60"></div></div>
+<script>window.__ldN=0;window.__ld=function(t){window.__ldN++;var b=document.querySelector('#lbar i'),x=document.getElementById('ltxt');var p=Math.min(100,Math.round(window.__ldN/(window.__ldT||6)*100));if(b)b.style.width=p+'%';if(x)x.textContent=t||('正在加载游戏素材… '+p+'%')}</script>
 <div id="start" style="display:none"><div class="box pan">
   <h1>听道</h1><div class="sub">灵河求生 · 中州篇<br>九州之地，中州最强。上四州属原生修士，下四州为穿越者所据。<br>你流落到中州的「灵河界」——活下去，然后造舟回乡，或者击败敌首。</div>
   <div class="facs"><div class="fac" data-f="A"><b>☯ 修士</b><small>来自上四州的原生修仙者。会画火符（技能键），能炼灵剑；后期火符可升级成雷符。</small></div>
@@ -186,18 +187,19 @@ body.inpro #quest,body.inpro #wp,body.inpro #ip,body.inpro #qdone,body.inpro #in
 <script>window.__t=setTimeout(function(){if(!window.GAME_OK){var m=document.getElementById('lmsg');m.innerHTML='3D 引擎加载失败或太慢。<br>请刷新页面重试；如果在微信里打开，请点右上角「在浏览器打开」。'}},15000);
 window.addEventListener('error',function(e){var m=document.getElementById('lmsg');if(m&&document.getElementById('loading').style.display!=='none')m.textContent='出错：'+e.message});</script>
 <script type="importmap">{"imports":{"three":"./vendor/three/three.module.min.js","three/addons/":"./vendor/three/addons/"}}</script>
-<script src="assets/nat_assets.js"></script>
-<script src="assets/mkt_assets.js"></script>
-<script src="assets/fangshi_assets.js"></script>
-<script src="assets/tex_assets.js"></script>
-<script src="assets/gtree_assets.js"></script>
+<script>window.__ldT=6</script>
+<script src="assets/nat_assets.js" onload="__ld()"></script>
+<script src="assets/mkt_assets.js" onload="__ld()"></script>
+<script src="assets/fangshi_assets.js" onload="__ld()"></script>
+<script src="assets/tex_assets.js" onload="__ld()"></script>
+<script src="assets/gtree_assets.js" onload="__ld()"></script>
 <script type="module">
 import * as THREE from 'three';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
-window.GAME_OK=true;clearTimeout(window.__t);
+window.GAME_OK=true;clearTimeout(window.__t);try{window.__ld('正在启动 3D 引擎…')}catch(e){}
 /* =====================================================================
    《听道 · 灵河求生》完整版
    一、核心：渲染器、天空、地形、水面            （本段）
@@ -1949,7 +1951,8 @@ function drawStart(){document.querySelectorAll('.fac').forEach(c=>c.classList.to
   newArm=false;el('newg').textContent=s?'新游戏（'+FACTION[pickF].n+'）':'新游戏'}
 document.querySelectorAll('.fac').forEach(c=>c.onclick=()=>{pickF=c.dataset.f;if(!(ORIGINS[pickF]||{})[pickO])pickO=Object.keys(ORIGINS[pickF])[0];drawStart()});drawStart();
 function landLock(){try{if(matchMedia('(pointer:coarse)').matches){const d=document.documentElement,f=d.requestFullscreen||d.webkitRequestFullscreen;const lk=()=>{try{screen.orientation&&screen.orientation.lock&&screen.orientation.lock('landscape').catch(()=>{})}catch(e){}};if(f&&!document.fullscreenElement&&!matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches){const r=f.call(d);r&&r.then?r.then(lk,()=>{}):lk()}else lk()}}catch(e){}}
-async function go(sv){landLock();el('start').style.display='none';el('hud').style.display='';await startGame(sv?sv.faction:pickF,sv?sv.origin:pickO,sv);if(!sv&&CH!==2)try{startPrologue()}catch(e){console.warn('prologue',e)}if(G.faction!=='A')el('manaRow').firstChild.textContent='能量';
+async function go(sv){landLock();el('start').style.display='none';const L=el('loading');L.style.display='';el('ltxt').textContent='正在载入人物和怪物模型…';el('lbar').style.display='none';el('lmsg').textContent='';
+  el('hud').style.display='';try{await startGame(sv?sv.faction:pickF,sv?sv.origin:pickO,sv)}finally{L.style.display='none'}if(!sv&&CH!==2)try{startPrologue()}catch(e){console.warn('prologue',e)}if(G.faction!=='A')el('manaRow').firstChild.textContent='能量';
   el('skillB').textContent=G.faction==='A'?'火符':'射击';}
 el('newg').onclick=()=>{if(slot(pickF)&&!newArm){newArm=true;el('newg').textContent='再点一次：覆盖'+FACTION[pickF].n+'的旧存档开新局';return}
   try{localStorage.removeItem(SAVE_KEY+'_'+pickF)}catch(e){}

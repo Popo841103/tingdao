@@ -3,7 +3,7 @@ import { Sky } from 'three/addons/objects/Sky.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
-window.GAME_OK=true;clearTimeout(window.__t);
+window.GAME_OK=true;clearTimeout(window.__t);try{window.__ld('正在启动 3D 引擎…')}catch(e){}
 /* =====================================================================
    《听道 · 灵河求生》完整版
    一、核心：渲染器、天空、地形、水面            （本段）

@@ -133,7 +133,8 @@ body.inpro #quest,body.inpro #wp,body.inpro #ip,body.inpro #qdone,body.inpro #in
 #achPop.on{animation:achIn 4s forwards}@keyframes achIn{0%{opacity:0;transform:translate(-50%,-20px)}10%,82%{opacity:1;transform:translate(-50%,0)}100%{opacity:0;transform:translate(-50%,-20px)}}
 </style></head><body>
 <div id="rot"><b>📱</b>请把手机横过来玩<br><span style="font-size:14px;opacity:.75">（如果转不过来：打开手机的「自动旋转」，关掉「竖屏锁定」）</span></div><canvas id="c"></canvas>
-<div id="loading"><b>听道</b><div>正在加载 3D 引擎…</div><div id="lmsg" style="font-size:13px;color:#8a7a60"></div></div>
+<div id="loading"><b>听道</b><div id="ltxt">正在加载游戏素材…</div><div id="lbar" style="width:min(320px,70vw);height:10px;border-radius:6px;background:rgba(0,0,0,.12);overflow:hidden"><i style="display:block;height:100%;width:3%;background:linear-gradient(90deg,#4aa8d0,#7ad0f0);transition:width .3s"></i></div><div id="lmsg" style="font-size:13px;color:#8a7a60"></div></div>
+<script>window.__ldN=0;window.__ld=function(t){window.__ldN++;var b=document.querySelector('#lbar i'),x=document.getElementById('ltxt');var p=Math.min(100,Math.round(window.__ldN/(window.__ldT||6)*100));if(b)b.style.width=p+'%';if(x)x.textContent=t||('正在加载游戏素材… '+p+'%')}</script>
 <div id="start" style="display:none"><div class="box pan">
   <h1>听道</h1><div class="sub">灵河求生 · 中州篇<br>九州之地，中州最强。上四州属原生修士，下四州为穿越者所据。<br>你流落到中州的「灵河界」——活下去，然后造舟回乡，或者击败敌首。</div>
   <div class="facs"><div class="fac" data-f="A"><b>☯ 修士</b><small>来自上四州的原生修仙者。会画火符（技能键），能炼灵剑；后期火符可升级成雷符。</small></div>

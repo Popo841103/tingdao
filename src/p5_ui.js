@@ -21,7 +21,8 @@ function drawStart(){document.querySelectorAll('.fac').forEach(c=>c.classList.to
   newArm=false;el('newg').textContent=s?'新游戏（'+FACTION[pickF].n+'）':'新游戏'}
 document.querySelectorAll('.fac').forEach(c=>c.onclick=()=>{pickF=c.dataset.f;if(!(ORIGINS[pickF]||{})[pickO])pickO=Object.keys(ORIGINS[pickF])[0];drawStart()});drawStart();
 function landLock(){try{if(matchMedia('(pointer:coarse)').matches){const d=document.documentElement,f=d.requestFullscreen||d.webkitRequestFullscreen;const lk=()=>{try{screen.orientation&&screen.orientation.lock&&screen.orientation.lock('landscape').catch(()=>{})}catch(e){}};if(f&&!document.fullscreenElement&&!matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches){const r=f.call(d);r&&r.then?r.then(lk,()=>{}):lk()}else lk()}}catch(e){}}
-async function go(sv){landLock();el('start').style.display='none';el('hud').style.display='';await startGame(sv?sv.faction:pickF,sv?sv.origin:pickO,sv);if(!sv&&CH!==2)try{startPrologue()}catch(e){console.warn('prologue',e)}if(G.faction!=='A')el('manaRow').firstChild.textContent='能量';
+async function go(sv){landLock();el('start').style.display='none';const L=el('loading');L.style.display='';el('ltxt').textContent='正在载入人物和怪物模型…';el('lbar').style.display='none';el('lmsg').textContent='';
+  el('hud').style.display='';try{await startGame(sv?sv.faction:pickF,sv?sv.origin:pickO,sv)}finally{L.style.display='none'}if(!sv&&CH!==2)try{startPrologue()}catch(e){console.warn('prologue',e)}if(G.faction!=='A')el('manaRow').firstChild.textContent='能量';
   el('skillB').textContent=G.faction==='A'?'火符':'射击';}
 el('newg').onclick=()=>{if(slot(pickF)&&!newArm){newArm=true;el('newg').textContent='再点一次：覆盖'+FACTION[pickF].n+'的旧存档开新局';return}
   try{localStorage.removeItem(SAVE_KEY+'_'+pickF)}catch(e){}
