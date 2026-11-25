@@ -131,7 +131,7 @@ function animBeast(b,sp,dt,st){const r=b.beast;b.phase+=dt*(sp>.1?sp*2.2:1.2);co
 
 /* ---------- Grok 生成的模型：敌兵、首领、狼、野猪 ---------- */
 const GROKM={};
-const GROK_KEYS=['viking','boy','xianxia','wolf','boar','youhun','deer','rabbit','merchant'];
+const GROK_KEYS=['viking','boy','xianxia','wolf','boar','youhun','deer','rabbit','merchant','pavilion','boat'];
 async function grokPreload(){await Promise.all(GROK_KEYS.map(async k=>{if(GROKM[k])return;try{const r=await fetch('assets/models/'+k+'.glb');if(!r.ok)throw new Error(r.status);GROKM[k]=await parseGLB(await r.arrayBuffer())}catch(e){console.warn('grok',k,e)}}))}
 function grokHuman(k,scale=1){const gl=GROKM[k];if(!gl)return null;const w=glbWrap(gl,false,true);w.scale.setScalar(scale);w.grok=k;return w}
 const GB_MAT={};

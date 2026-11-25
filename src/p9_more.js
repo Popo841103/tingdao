@@ -140,5 +140,16 @@ if(CH===2&&REGD.pano){new THREE.TextureLoader().load(REGD.pano,t=>{t.colorSpace=
   sky.visible=false;stars.visible=false;moon.visible=false;cloudMat.visible=false},undefined,e=>console.warn('pano',e))}
 function updPano(){if(!PANO.m)return;PANO.m.position.copy(camera.position);const {day}=dayK();PANO.m.material.color.setScalar(.4+.6*day)}
 
+/* ---------- 场景模型（混元生成）：河边亭子、灵舟。没加载到模型时退回程序拼的 ---------- */
+function fitModel(gl,size,axis){const o=gl.scene.clone(true);const b=new THREE.Box3().setFromObject(o),sz=b.getSize(new THREE.Vector3());const k=size/(axis==='y'?sz.y:Math.max(sz.x,sz.z));
+  o.scale.setScalar(k);const b2=new THREE.Box3().setFromObject(o),c=b2.getCenter(new THREE.Vector3());o.position.set(-c.x,-b2.min.y,-c.z);const g=new THREE.Group();g.add(o);
+  o.traverse(m=>{if(m.isMesh){m.castShadow=true;m.receiveShadow=true}});return g}
+function modelBoat(){try{if(!GROKM.boat)return null}catch(e){return null}   // 启动早期 GROKM 还没初始化
+  const g=fitModel(GROKM.boat,10,'xz');g.children[0].position.y-=1.1;   // 船身吃水 1.1 米
+  const dummy=new THREE.Object3D();dummy.visible=false;g.add(dummy);g.userData.sail=dummy;return g}
+function placeSceneModels(){
+  if(PAV&&!PAV.done){PAV.done=true;if(GROKM.pavilion){const g=fitModel(GROKM.pavilion,5.2,'y');g.position.set(PAV.x,groundAt(PAV.x,PAV.z)-.05,PAV.z);g.rotation.y=PAV.ry;scene.add(g)}else PAV.proc()}
+  if(GROKM.boat)for(const b of DECOR_BOATS){const nb=modelBoat();for(const ch of [...b.children])ch.visible=false;const s=b.scale.x;nb.scale.setScalar(1/Math.max(.01,s)*Math.min(1,s*1.4));b.add(nb)}}
+
 /* ---------- 每帧 ---------- */
 function moreTick(dt){updPano();P.dodgeCd=(P.dodgeCd||0)-dt;P.dodgeT=(P.dodgeT||0)-dt;updPrologue(dt);achCheck(dt);updEnv(dt)}

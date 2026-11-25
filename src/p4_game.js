@@ -362,7 +362,7 @@ function gainXP(n){if(G.over||!G.started||G.prologue)return;G.xp+=n;ftxt(P.x,P.y
     toast('升级了！'+rankName()+'：生命体力回满，获得 '+(2*up)+' 个属性点（点左上角「加点」）',1);save()}}
 async function startGame(fac,origin,sv){G.starting=true;try{await grokPreload()}catch(e){}
   G.faction=fac;G.origin=origin;G.realm=sv&&sv.realm||0;G.lv=sv&&sv.lv||1;G.xp=sv&&sv.xp||0;G.pts=sv&&sv.pts||0;G.st=Object.assign({str:0,vit:0,agi:0,spi:0},sv&&sv.st||{});Object.assign(G,{qi:sv&&sv.qi||0,wtier:sv&&sv.wtier||0,cleared:sv&&sv.cleared||{},bases:sv&&sv.bases||{},rflags:sv&&sv.rflags||{},perks:sv&&sv.perks||{},skillSel:sv&&sv.skillSel||'base'});applyOrigin();G.hp=G.maxhp;G.sta=G.maxsta;G.mana=G.maxmana;G.inv={};G.tools={};
-  buildCamp('home',fac,false);buildCamp('enemy',FACTION[fac].foe,true);bakeAll();
+  buildCamp('home',fac,false);buildCamp('enemy',FACTION[fac].foe,true);try{placeSceneModels()}catch(e){console.warn('scene models',e);if(PAV&&!PAV.done)PAV.proc()}bakeAll();
   P.x=ZONES.home.x+3;P.z=ZONES.home.z+4;P.yaw=Math.PI*.6;
   if(sv){Object.assign(G,{inv:sv.inv||{},tools:sv.tools||{},hp:sv.hp,hunger:sv.hunger,sta:sv.sta,mana:sv.mana||0,hour:sv.hour,day:sv.day,water:sv.water||0,flags:sv.flags||{},bossDead:!!sv.bossDead});if(sv.x!=null){P.x=sv.x;P.z=sv.z}if(G.tools.xian)WEAPONS.xian.n=fac==='A'?'仙剑·流云':'合金战刀';for(const b of sv.builds||[])placeBuild(b.t,b.x,b.z,b.ry,{stage:b.stage,g:b.g})}
   if(sv){G.hp=Math.max(G.hp||0,(G.maxhp||100)*.6);G.hunger=Math.max(G.hunger||0,60)}
